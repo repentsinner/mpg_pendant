@@ -115,9 +115,9 @@ void main() {
   });
 
   group('Display payload assembly', () {
-    test('payload is 24 bytes', () {
+    test('payload is 21 bytes', () {
       final payload = encodeDisplayPayload(const DisplayUpdate());
-      expect(payload.length, 24);
+      expect(payload.length, 21);
     });
 
     test('payload starts with header 0xFE, 0xFD, 0xFE', () {
@@ -168,23 +168,20 @@ void main() {
       expect(payload[19], 0x5D);
     });
 
-    test('padding bytes 20-23 are zero', () {
+    test('padding byte 20 is zero', () {
       final payload = encodeDisplayPayload(const DisplayUpdate(
         axis1: 999.999,
         feedRate: 65535,
         spindleSpeed: 65535,
       ));
       expect(payload[20], 0);
-      expect(payload[21], 0);
-      expect(payload[22], 0);
-      expect(payload[23], 0);
     });
   });
 
   group('Report chunking', () {
-    test('produces exactly 4 reports', () {
+    test('produces exactly 3 reports', () {
       final reports = encodeDisplayUpdate(const DisplayUpdate());
-      expect(reports.length, 4);
+      expect(reports.length, 3);
     });
 
     test('each report is 8 bytes', () {
@@ -229,8 +226,8 @@ void main() {
         reconstructed.addAll(report.sublist(1)); // skip report ID
       }
 
-      // First 24 bytes should match the payload
-      for (var i = 0; i < 24; i++) {
+      // First 21 bytes should match the payload
+      for (var i = 0; i < 21; i++) {
         expect(reconstructed[i], payload[i],
             reason: 'Mismatch at payload byte $i');
       }

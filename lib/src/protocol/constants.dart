@@ -4,6 +4,9 @@ const int pendantVendorId = 0x10CE;
 /// USB Product ID for WHB04B-family pendants.
 const int pendantProductId = 0xEB93;
 
+/// HID interface number for input reports and feature reports.
+const int pendantInterfaceNumber = 0;
+
 /// Input report header byte.
 const int inputReportHeader = 0x04;
 
@@ -20,7 +23,7 @@ const int inputPacketLength = 8;
 const int displayReportLength = 8;
 
 /// Number of display feature reports per update.
-const int displayReportCount = 4;
+const int displayReportCount = 3;
 
 /// Total display payload bytes (across all reports, excluding report IDs).
-const int displayPayloadLength = 24;
+const int displayPayloadLength = 21;

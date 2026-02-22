@@ -10,6 +10,6 @@ export 'src/protocol/models.dart';
 
 // Device layer — HID I/O abstraction.
 export 'src/device/hid_backend.dart';
-export 'src/device/hidapi_backend.dart';
+export 'src/device/hidapi_hid_backend.dart';
 export 'src/device/pendant_connection.dart';
 export 'src/device/pendant_discovery.dart';

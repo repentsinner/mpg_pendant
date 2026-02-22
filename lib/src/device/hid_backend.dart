@@ -1,5 +1,14 @@
 import 'dart:typed_data';
 
+/// Exception thrown when a HID operation fails.
+class HidException implements Exception {
+  HidException(this.message);
+  final String message;
+
+  @override
+  String toString() => 'HidException: $message';
+}
+
 /// Information about a discovered HID device.
 class HidDeviceInfo {
   const HidDeviceInfo({
@@ -9,6 +18,9 @@ class HidDeviceInfo {
     this.manufacturer = '',
     this.product = '',
     this.serialNumber = '',
+    this.usagePage = 0,
+    this.usage = 0,
+    this.interfaceNumber = -1,
   });
 
   final int vendorId;
@@ -17,11 +29,17 @@ class HidDeviceInfo {
   final String manufacturer;
   final String product;
   final String serialNumber;
+  final int usagePage;
+  final int usage;
+  final int interfaceNumber;
 
   @override
   String toString() =>
       'HidDeviceInfo(vid: 0x${vendorId.toRadixString(16)}, '
-      'pid: 0x${productId.toRadixString(16)}, path: $path)';
+      'pid: 0x${productId.toRadixString(16)}, '
+      'usagePage: 0x${usagePage.toRadixString(16)}, '
+      'usage: 0x${usage.toRadixString(16)}, '
+      'interface: $interfaceNumber, path: $path)';
 }
 
 /// Opaque handle to an open HID device.
