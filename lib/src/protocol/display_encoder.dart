@@ -28,7 +28,17 @@ int encodeFlags(DisplayUpdate update) {
   return flags;
 }
 
-/// Encodes a [DisplayUpdate] into a 24-byte logical payload.
+/// Encodes a [DisplayUpdate] into a 21-byte logical payload.
+///
+/// Layout (offsets in bytes):
+///   0-2: header (0xFE 0xFD 0xFE)
+///   3:   flags (mode, reset, coord space)
+///   4-7: axis 1 coordinate
+///   8-11: axis 2 coordinate
+///   12-15: axis 3 coordinate
+///   16-17: feed rate override percentage (16-bit LE)
+///   18-19: spindle speed (16-bit LE)
+///   20: padding
 Uint8List encodeDisplayPayload(DisplayUpdate update) {
   final payload = Uint8List(displayPayloadLength);
 
@@ -56,11 +66,11 @@ Uint8List encodeDisplayPayload(DisplayUpdate update) {
   payload[18] = update.spindleSpeed & 0xFF;
   payload[19] = (update.spindleSpeed >> 8) & 0xFF;
 
-  // Bytes 20-23 are padding (already zero)
+  // Byte 20 is padding (already zero)
   return payload;
 }
 
-/// Chunks a 24-byte payload into 4 feature reports of 8 bytes each.
+/// Chunks a 21-byte payload into 3 feature reports of 8 bytes each.
 ///
 /// Each report is: `[0x06, <7 data bytes>]`.
 List<Uint8List> chunkDisplayReports(Uint8List payload) {
@@ -79,7 +89,7 @@ List<Uint8List> chunkDisplayReports(Uint8List payload) {
   return reports;
 }
 
-/// Encodes a [DisplayUpdate] into a list of 4 feature reports ready to send.
+/// Encodes a [DisplayUpdate] into a list of 3 feature reports ready to send.
 List<Uint8List> encodeDisplayUpdate(DisplayUpdate update) {
   return chunkDisplayReports(encodeDisplayPayload(update));
 }

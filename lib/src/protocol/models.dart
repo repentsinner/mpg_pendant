@@ -16,10 +16,47 @@ enum PendantButton {
   probeZ(0x0D),
   continuous(0x0E),
   step(0x0F),
-  macro10(0x10);
+  macro10(0x10),
+  macro1(0x81),
+  macro2(0x82),
+  macro3(0x83),
+  macro4(0x84),
+  macro5(0x85),
+  macro6(0x86),
+  macro7(0x87),
+  macro8(0x88),
+  macro9(0x89);
 
   const PendantButton(this.code);
   final int code;
+
+  /// Buttons with dual function/macro labels. Maps the function button
+  /// to its corresponding macro.
+  static const _fnPairs = {
+    PendantButton.feedPlus: PendantButton.macro1,
+    PendantButton.feedMinus: PendantButton.macro2,
+    PendantButton.spindlePlus: PendantButton.macro3,
+    PendantButton.spindleMinus: PendantButton.macro4,
+    PendantButton.mHome: PendantButton.macro5,
+    PendantButton.safeZ: PendantButton.macro6,
+    PendantButton.wHome: PendantButton.macro7,
+    PendantButton.spindleOnOff: PendantButton.macro8,
+    PendantButton.probeZ: PendantButton.macro9,
+  };
+
+  /// Whether this button has dual function/macro labels.
+  bool get isDualLabel => _fnPairs.containsKey(this);
+
+  /// Returns the macro equivalent of this dual-label button, or null.
+  PendantButton? get macroEquivalent => _fnPairs[this];
+
+  /// Returns the function equivalent of this macro button, or null.
+  PendantButton? get functionEquivalent {
+    for (final entry in _fnPairs.entries) {
+      if (entry.value == this) return entry.key;
+    }
+    return null;
+  }
 
   static PendantButton fromCode(int code) {
     for (final value in values) {
