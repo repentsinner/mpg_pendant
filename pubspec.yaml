@@ -3,7 +3,7 @@ description: >-
   Cross-platform USB HID driver for XHC WHB04B-family CNC pendants
   (xHB04B, WHB04B-4, WHB04B-6). Decodes button, jog wheel, and selector
   events; encodes display updates.
-version: 0.1.0
+version: 0.1.1
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
