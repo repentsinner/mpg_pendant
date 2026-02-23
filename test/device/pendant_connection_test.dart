@@ -213,12 +213,12 @@ void main() {
         ],
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
 
-      final stream = conn.open();
+      final stream = await conn.open();
       final state = await stream.first;
 
       expect(backend.openCalled, isTrue);
@@ -241,16 +241,16 @@ void main() {
         readException: Exception('Device disconnected'),
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
-      final stream = conn.open();
+      final stream = await conn.open();
 
       await expectLater(stream, emitsError(isA<Exception>()));
     });
 
-    test('sends display update as 4 feature reports', () {
+    test('sends display update as 3 feature reports', () async {
       final backend = MockHidBackend(
         devices: [
           const HidDeviceInfo(
@@ -261,11 +261,11 @@ void main() {
         ],
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
-      conn.open();
+      await conn.open();
       conn.updateDisplay(const DisplayUpdate(axis1: 100.0));
 
       expect(backend.sentFeatureReports.length, 3);
@@ -274,7 +274,7 @@ void main() {
         expect(report[0], 0x06);
       }
 
-      conn.close();
+      await conn.close();
     });
 
     test('throws when updating display on closed connection', () {
@@ -288,7 +288,7 @@ void main() {
         ],
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
@@ -298,7 +298,7 @@ void main() {
       );
     });
 
-    test('sendResetSequence sends two display updates', () {
+    test('sendResetSequence sends two display updates', () async {
       final backend = MockHidBackend(
         devices: [
           const HidDeviceInfo(
@@ -309,11 +309,11 @@ void main() {
         ],
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
-      conn.open();
+      await conn.open();
       conn.sendResetSequence();
 
       // 2 updates × 3 reports each = 6 feature reports
@@ -325,7 +325,7 @@ void main() {
       // Second update should have reset flag cleared
       expect(backend.sentFeatureReports[3][4] & 0x40, 0x00);
 
-      conn.close();
+      await conn.close();
     });
 
     test('detects 6-axis variant from axis B code', () async {
@@ -342,11 +342,11 @@ void main() {
         ],
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
-      final stream = conn.open();
+      final stream = await conn.open();
       final state = await stream.first;
 
       expect(state.axis, PendantAxis.b);
@@ -367,11 +367,11 @@ void main() {
         ],
       );
 
-      final conn = PendantConnection(
+      final conn = PendantConnection.withBackend(
         backend,
         _sameDevice(backend.devices.first),
       );
-      final stream = conn.open();
+      final stream = await conn.open();
       final state = await stream.first;
 
       expect(state.axis, PendantAxis.c);
@@ -393,11 +393,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.feedPlus);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -417,11 +417,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.macro1);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -441,11 +441,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.fn);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -465,11 +465,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.reset);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -489,11 +489,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.stop);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -513,11 +513,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.macro10);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -539,12 +539,12 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
           fnInverted: false,
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.macro1);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -565,12 +565,12 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
           fnInverted: false,
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.feedPlus);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -590,12 +590,12 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
           fnInverted: false,
         );
-        final state = await conn.open().first;
+        final state = await (await conn.open()).first;
         expect(state.button1, PendantButton.stop);
         expect(state.button2, PendantButton.none);
         await conn.close();
@@ -614,7 +614,7 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
@@ -635,11 +635,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        await conn.open().first;
+        await (await conn.open()).first;
         expect(conn.motionMode, MotionMode.step);
         await conn.close();
       });
@@ -659,18 +659,19 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final states = await conn.open().take(2).toList();
+        final states = await (await conn.open()).take(2).toList();
         expect(states[0].button1, PendantButton.step);
         expect(states[1].button1, PendantButton.continuous);
         expect(conn.motionMode, MotionMode.continuous);
         await conn.close();
       });
 
-      test('step button re-sends last display update with step mode', () async {
+      test('step button re-sends last display update with step mode',
+          () async {
         final backend = MockHidBackend(
           devices: [
             const HidDeviceInfo(
@@ -684,11 +685,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        final stream = conn.open();
+        final stream = await conn.open();
 
         // Send initial display update (mode defaults to continuous).
         conn.updateDisplay(const DisplayUpdate(feedRate: 500));
@@ -724,11 +725,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        await conn.open().first;
+        await (await conn.open()).first;
 
         // No display updates should have been sent.
         expect(backend.sentFeatureReports, isEmpty);
@@ -737,7 +738,7 @@ void main() {
         await conn.close();
       });
 
-      test('motionMode setter updates tracked mode', () {
+      test('motionMode setter updates tracked mode', () async {
         final backend = MockHidBackend(
           devices: [
             const HidDeviceInfo(
@@ -748,11 +749,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        conn.open();
+        await conn.open();
         conn.motionMode = MotionMode.mpg;
         expect(conn.motionMode, MotionMode.mpg);
 
@@ -762,10 +763,10 @@ void main() {
         final flags = backend.sentFeatureReports[0][4];
         expect(flags & 0x03, MotionMode.mpg.value);
 
-        conn.close();
+        await conn.close();
       });
 
-      test('updateDisplay uses tracked motion mode', () {
+      test('updateDisplay uses tracked motion mode', () async {
         final backend = MockHidBackend(
           devices: [
             const HidDeviceInfo(
@@ -776,11 +777,11 @@ void main() {
           ],
         );
 
-        final conn = PendantConnection(
+        final conn = PendantConnection.withBackend(
           backend,
           _sameDevice(backend.devices.first),
         );
-        conn.open();
+        await conn.open();
         // Caller passes step mode, but tracked mode is continuous (default).
         conn.updateDisplay(const DisplayUpdate(mode: MotionMode.step));
 
@@ -788,11 +789,11 @@ void main() {
         final flags = backend.sentFeatureReports[0][4];
         expect(flags & 0x03, MotionMode.continuous.value);
 
-        conn.close();
+        await conn.close();
       });
     });
 
-    test('uses separate handles for read and write', () {
+    test('uses separate handles for read and write', () async {
       final backend = MockHidBackend(
         devices: [
           const HidDeviceInfo(
@@ -814,13 +815,13 @@ void main() {
         writeDevice: backend.devices[1],
       );
 
-      final conn = PendantConnection(backend, pendant);
-      conn.open();
+      final conn = PendantConnection.withBackend(backend, pendant);
+      await conn.open();
       // Write should go to Col02 (not Col01 which would throw).
       conn.updateDisplay(const DisplayUpdate());
       expect(backend.sentFeatureReports.length, 3);
 
-      conn.close();
+      await conn.close();
     });
   });
 }
