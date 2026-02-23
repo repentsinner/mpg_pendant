@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:isolate';
+import 'dart:typed_data';
 
 import '../protocol/constants.dart';
 import '../protocol/display_encoder.dart';
 import '../protocol/input_packet.dart';
 import '../protocol/models.dart';
 import 'hid_backend.dart';
+import 'hid_worker.dart';
+import 'isolate_messages.dart';
 import 'pendant_discovery.dart';
 
 /// Manages a connection to a single WHB04B pendant.
@@ -12,14 +16,29 @@ import 'pendant_discovery.dart';
 /// Provides a stream of decoded [PendantState] events and methods
 /// to send display updates.
 ///
-/// On Windows the pendant exposes separate HID collections for input
-/// reads and feature report writes, so this class manages two handles
-/// when needed.
+/// Production path: [PendantConnection.new] spawns a worker isolate
+/// that owns all HID I/O, polling with a short timeout (~2ms) to
+/// reach the USB interrupt endpoint's native delivery rate.
+///
+/// Test path: [PendantConnection.withBackend] runs synchronously on
+/// the main isolate using an injected [HidBackend].
 class PendantConnection {
-  PendantConnection(this._backend, this._pendant, {this.fnInverted = true});
+  /// Production constructor — spawns a worker isolate for HID I/O.
+  PendantConnection(this._pendant, {this.fnInverted = true})
+      : _backend = null,
+        _useIsolate = true;
 
-  final HidBackend _backend;
+  /// Test constructor — runs HID I/O synchronously on the main isolate.
+  PendantConnection.withBackend(
+    HidBackend backend,
+    this._pendant, {
+    this.fnInverted = true,
+  })  : _backend = backend,
+        _useIsolate = false;
+
+  final HidBackend? _backend;
   final PendantDeviceInfo _pendant;
+  final bool _useIsolate;
 
   /// When true (default), dual-label buttons report their function name
   /// (feedPlus, mHome, etc.) without Fn, and their macro name (macro1-9)
@@ -31,58 +50,105 @@ class PendantConnection {
   MotionMode motionMode = MotionMode.continuous;
 
   DisplayUpdate? _lastDisplayUpdate;
+  StreamController<PendantState>? _controller;
+
+  // Sync path fields.
   HidDeviceHandle? _readHandle;
   HidDeviceHandle? _writeHandle;
-  StreamController<PendantState>? _controller;
   bool _reading = false;
 
+  // Isolate path fields.
+  Isolate? _isolate;
+  SendPort? _commandPort;
+  ReceivePort? _eventPort;
+  Completer<void>? _stoppedCompleter;
+
   /// Whether the connection is currently open.
-  bool get isOpen => _readHandle != null;
+  bool get isOpen => _useIsolate ? _isolate != null : _readHandle != null;
 
   /// Opens the connection and starts reading input reports.
   ///
-  /// Returns a stream of decoded pendant state updates.
-  Stream<PendantState> open() {
-    if (_readHandle != null) {
+  /// Returns a future that completes with a stream of decoded pendant
+  /// state updates once the connection is established.
+  Future<Stream<PendantState>> open() async {
+    if (isOpen) {
       throw StateError('Connection already open');
     }
 
-    _readHandle = _backend.open(_pendant.readDevice.path);
-    if (_pendant.writeDevice.path != _pendant.readDevice.path) {
-      _writeHandle = _backend.open(_pendant.writeDevice.path);
-    } else {
-      _writeHandle = _readHandle;
-    }
     _controller = StreamController<PendantState>(
       onCancel: () => close(),
     );
-    _startReading();
+
+    if (_useIsolate) {
+      await _openIsolate();
+    } else {
+      _openSync();
+    }
+
     return _controller!.stream;
   }
 
-  void _startReading() {
+  // ── Isolate path ────────────────────────────────────────────────────────
+
+  Future<void> _openIsolate() async {
+    _eventPort = ReceivePort();
+    _stoppedCompleter = Completer<void>();
+
+    final readyCompleter = Completer<SendPort>();
+
+    _eventPort!.listen((message) {
+      if (message is WorkerReady) {
+        readyCompleter.complete(message.commandPort);
+      } else if (message is InputPacketEvent) {
+        _handleInputPacket(message.data);
+      } else if (message is WorkerError) {
+        if (_controller != null && !_controller!.isClosed) {
+          _controller!.addError(Exception(message.message));
+        }
+      } else if (message is WorkerStopped) {
+        _eventPort?.close();
+        if (!_stoppedCompleter!.isCompleted) {
+          _stoppedCompleter!.complete();
+        }
+      }
+    });
+
+    final startup = WorkerStartup(
+      sendPort: _eventPort!.sendPort,
+      readDevicePath: _pendant.readDevice.path,
+      writeDevicePath: _pendant.writeDevice.path,
+    );
+
+    _isolate = await Isolate.spawn(hidWorkerEntryPoint, startup);
+    _commandPort = await readyCompleter.future;
+  }
+
+  // ── Sync path (tests) ──────────────────────────────────────────────────
+
+  void _openSync() {
+    final backend = _backend!;
+    _readHandle = backend.open(_pendant.readDevice.path);
+    if (_pendant.writeDevice.path != _pendant.readDevice.path) {
+      _writeHandle = backend.open(_pendant.writeDevice.path);
+    } else {
+      _writeHandle = _readHandle;
+    }
+    _startReadingSync();
+  }
+
+  void _startReadingSync() {
     _reading = true;
-    // Run the read loop asynchronously, yielding to the event loop
-    // between reads so stream listeners can process events.
     Future(() async {
       while (_reading && _readHandle != null) {
         try {
-          final data = _backend.read(
+          final data = _backend!.read(
             _readHandle!,
             inputPacketLength,
             timeout: const Duration(milliseconds: 100),
           );
           if (data.isNotEmpty) {
-            final raw = decodeInputPacket(data);
-            if (raw != null &&
-                _controller != null &&
-                !_controller!.isClosed) {
-              final state = _interpretButtons(raw);
-              _trackMotionMode(state);
-              _controller!.add(state);
-            }
+            _handleInputPacket(data);
           }
-          // Yield to the event loop so stream listeners can fire.
           await Future<void>.delayed(Duration.zero);
         } catch (e) {
           if (_controller != null && !_controller!.isClosed) {
@@ -90,11 +156,22 @@ class PendantConnection {
             _controller!.close();
           }
           _reading = false;
-          _cleanup();
+          _cleanupSync();
           return;
         }
       }
     });
+  }
+
+  // ── Shared packet handling ─────────────────────────────────────────────
+
+  void _handleInputPacket(Uint8List data) {
+    final raw = decodeInputPacket(data);
+    if (raw != null && _controller != null && !_controller!.isClosed) {
+      final state = _interpretButtons(raw);
+      _trackMotionMode(state);
+      _controller!.add(state);
+    }
   }
 
   /// Sends a display update to the pendant.
@@ -102,8 +179,7 @@ class PendantConnection {
   /// The [MotionMode] in [update] is ignored; the tracked [motionMode]
   /// (set by continuous/step button presses) is used instead.
   void updateDisplay(DisplayUpdate update) {
-    final handle = _writeHandle;
-    if (handle == null) {
+    if (!isOpen) {
       throw StateError('Connection not open');
     }
 
@@ -120,8 +196,14 @@ class PendantConnection {
     );
 
     final reports = encodeDisplayUpdate(effective);
-    for (final report in reports) {
-      _backend.sendFeatureReport(handle, report);
+
+    if (_useIsolate) {
+      _commandPort!.send(WriteDisplayCommand(reports));
+    } else {
+      final handle = _writeHandle!;
+      for (final report in reports) {
+        _backend!.sendFeatureReport(handle, report);
+      }
     }
   }
 
@@ -133,13 +215,65 @@ class PendantConnection {
 
   /// Closes the connection and releases resources.
   Future<void> close() async {
-    _reading = false;
-    _cleanup();
+    if (_useIsolate) {
+      await _closeIsolate();
+    } else {
+      _closeSync();
+    }
     if (_controller != null && !_controller!.isClosed) {
-      await _controller!.close();
+      if (_controller!.hasListener) {
+        await _controller!.close();
+      } else {
+        _controller!.close();
+      }
     }
     _controller = null;
   }
+
+  // ── Isolate cleanup ────────────────────────────────────────────────────
+
+  Future<void> _closeIsolate() async {
+    if (_commandPort != null) {
+      _commandPort!.send(ShutdownCommand());
+      // Wait for worker to stop, with timeout.
+      await _stoppedCompleter?.future.timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () {},
+      );
+    }
+    _isolate?.kill(priority: Isolate.beforeNextEvent);
+    _isolate = null;
+    _commandPort = null;
+    _eventPort?.close();
+    _eventPort = null;
+    _stoppedCompleter = null;
+  }
+
+  // ── Sync cleanup ───────────────────────────────────────────────────────
+
+  void _closeSync() {
+    _reading = false;
+    _cleanupSync();
+  }
+
+  void _cleanupSync() {
+    final readHandle = _readHandle;
+    final writeHandle = _writeHandle;
+    _readHandle = null;
+    _writeHandle = null;
+    if (readHandle != null) {
+      try {
+        _backend!.close(readHandle);
+      } catch (_) {}
+    }
+    if (writeHandle != null && writeHandle != readHandle) {
+      try {
+        _backend!.close(writeHandle);
+      } catch (_) {}
+    }
+  }
+
+  // ── Button interpretation ──────────────────────────────────────────────
 
   /// Updates [motionMode] when continuous/step buttons are pressed.
   /// Re-sends the last display update with the new mode if available.
@@ -162,21 +296,13 @@ class PendantConnection {
   }
 
   /// Interprets raw button state according to [fnInverted] setting.
-  ///
-  /// Fn is always consumed by the interpretation layer:
-  /// - Fn + dual-label → applies inversion, Fn stripped
-  /// - Fn + non-dual → Fn stripped, button reported alone
-  /// - Fn alone → reported as fn
   PendantState _interpretButtons(PendantState raw) {
     final hasFn =
         raw.button1 == PendantButton.fn || raw.button2 == PendantButton.fn;
     if (!hasFn) {
-      // No Fn held.
       if (fnInverted) {
-        // Dual-label buttons already have function names — pass through.
         return raw;
       }
-      // fnInverted=false: dual-label buttons alone → macro equivalent.
       final b1 = raw.button1.isDualLabel
           ? raw.button1.macroEquivalent!
           : raw.button1;
@@ -192,13 +318,11 @@ class PendantConnection {
       );
     }
 
-    // Fn is held. Find the chord partner (the non-fn button).
     final partner = raw.button1 == PendantButton.fn
         ? raw.button2
         : raw.button1;
 
     if (partner == PendantButton.none) {
-      // Fn alone.
       return PendantState(
         button1: PendantButton.fn,
         button2: PendantButton.none,
@@ -208,18 +332,14 @@ class PendantConnection {
       );
     }
 
-    // Fn + some button. Determine the interpreted button.
     PendantButton interpreted;
     if (partner.isDualLabel) {
       if (fnInverted) {
-        // Default mode: Fn swaps to macro.
         interpreted = partner.macroEquivalent!;
       } else {
-        // Non-inverted: Fn swaps to function name (already the raw name).
         interpreted = partner;
       }
     } else {
-      // Non-dual button: just strip Fn.
       interpreted = partner;
     }
 
@@ -230,26 +350,5 @@ class PendantConnection {
       feed: raw.feed,
       jogDelta: raw.jogDelta,
     );
-  }
-
-  void _cleanup() {
-    final readHandle = _readHandle;
-    final writeHandle = _writeHandle;
-    _readHandle = null;
-    _writeHandle = null;
-    if (readHandle != null) {
-      try {
-        _backend.close(readHandle);
-      } catch (_) {
-        // Best-effort cleanup.
-      }
-    }
-    if (writeHandle != null && writeHandle != readHandle) {
-      try {
-        _backend.close(writeHandle);
-      } catch (_) {
-        // Best-effort cleanup.
-      }
-    }
   }
 }

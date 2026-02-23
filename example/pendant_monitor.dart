@@ -1,6 +1,7 @@
 /// Combined CLI example: discovers a pendant, monitors input events in a
-/// fixed-position terminal box, and sweeps display fields through their
-/// ranges so you can observe what each protocol field does on the LCD.
+/// fixed-position terminal box, and drives display updates at 125 Hz to
+/// test throughput. Axis 1 increments continuously so you can see the
+/// LCD refresh rate.
 ///
 /// Uses raw ANSI escapes — no dart_console dependency.
 ///
@@ -38,73 +39,6 @@ String _rule(String l, String r, [String? title]) {
   return '$l${'-' * (_w + 2)}$r';
 }
 
-// ── Sweep definition ─────────────────────────────────────────────────────────
-
-class _Step {
-  const _Step(this.label, this.update, {this.mode});
-  final String label;
-  final DisplayUpdate update;
-  final MotionMode? mode;
-}
-
-const _base = DisplayUpdate(
-  feedRate: 1000,
-  spindleSpeed: 12000,
-  coordinateSpace: CoordinateSpace.workpiece,
-);
-
-DisplayUpdate _with({
-  double a1 = 0,
-  double a2 = 0,
-  double a3 = 0,
-  int feed = 1000,
-  int spindle = 12000,
-  CoordinateSpace cs = CoordinateSpace.workpiece,
-  bool reset = false,
-}) =>
-    DisplayUpdate(
-      axis1: a1,
-      axis2: a2,
-      axis3: a3,
-      feedRate: feed,
-      spindleSpeed: spindle,
-      coordinateSpace: cs,
-      resetFlag: reset,
-    );
-
-List<_Step> _buildSweep() {
-  final s = <_Step>[];
-  void add(String l, DisplayUpdate u, {MotionMode? m}) =>
-      s.add(_Step(l, u, mode: m));
-
-  for (final v in [-999.0, -100.0, -1.0, 0.0, 0.001, 0.1, 1.0, 100.0, 999.0,
-      12345.6789]) {
-    add('axis1=$v', _with(a1: v));
-  }
-  for (final v in [-500.0, 0.0, 0.05, 250.0, 9999.9999]) {
-    add('axis2=$v', _with(a2: v));
-  }
-  for (final v in [-500.0, 0.0, 0.05, 250.0, 9999.9999]) {
-    add('axis3=$v', _with(a3: v));
-  }
-  for (final v in [0, 1, 100, 500, 1000, 5000, 10000, 30000, 65535]) {
-    add('feed=$v', _with(feed: v));
-  }
-  for (final v in [0, 1, 100, 1000, 5000, 12000, 24000, 65535]) {
-    add('spindle=$v', _with(spindle: v));
-  }
-  for (final m in MotionMode.values) {
-    add('mode=${m.name}', _base, m: m);
-  }
-  for (final cs in CoordinateSpace.values) {
-    add('space=${cs.name}', _with(cs: cs));
-  }
-  add('reset=true', _with(reset: true));
-  add('reset=false', _with());
-
-  return s;
-}
-
 // ── Feed selector labels ─────────────────────────────────────────────────────
 
 const _feedLabel = {
@@ -130,8 +64,8 @@ void main() async {
   }
 
   final pendant = pendants.first;
-  final conn = PendantConnection(backend, pendant);
-  final stream = conn.open();
+  final conn = PendantConnection(pendant);
+  final stream = await conn.open();
   conn.sendResetSequence();
 
   stdout.write(_hideCursor);
@@ -145,15 +79,15 @@ void main() async {
     jogDelta: 0,
   );
   var cumJog = 0;
-  var packets = 0;
-  var pps = 0;
-  var windowCount = 0;
+  var inputPackets = 0;
+  var inputPps = 0;
+  var inputWindowCount = 0;
 
-  // Sweep state.
-  final sweep = _buildSweep();
-  var si = 0;
-  var sweepLabel = '(starting)';
-  var sweepUpdate = _base;
+  // Display output state.
+  var displayTick = 0;
+  var displayUps = 0;
+  var displayWindowCount = 0;
+  var axis1Value = 0.0;
 
   // Track total lines drawn so we can rewind cursor.
   var lineCount = 0;
@@ -205,28 +139,20 @@ void main() async {
     lines.add(_pad(''));
 
     // -- Display output section --
-    lines.add(_pad(' -- Display Output -----------------------'));
-    lines.add(_pad(' Sweep: $sweepLabel'));
+    lines.add(_pad(' -- Display Output (125 Hz target) ------'));
     lines.add(_pad(
-      ' Ax1: ${sweepUpdate.axis1.toStringAsFixed(4).padLeft(12)}'
-      '  Ax2: ${sweepUpdate.axis2.toStringAsFixed(4).padLeft(12)}',
-    ));
-    lines.add(_pad(
-      ' Ax3: ${sweepUpdate.axis3.toStringAsFixed(4).padLeft(12)}',
-    ));
-    lines.add(_pad(
-      ' Feed: ${sweepUpdate.feedRate.toString().padLeft(5)}'
-      '    Spindle: ${sweepUpdate.spindleSpeed.toString().padLeft(5)}',
-    ));
-    lines.add(_pad(
-      ' Mode: ${conn.motionMode.name.padRight(10)}'
-      ' Space: ${sweepUpdate.coordinateSpace.name.padRight(9)}'
-      ' Rst: ${sweepUpdate.resetFlag}',
+      ' Ax1: ${axis1Value.toStringAsFixed(4).padLeft(12)}'
+      '  (tick $displayTick)',
     ));
     lines.add(_pad(''));
 
     // -- Stats --
-    lines.add(_pad(' Pkts: $packets  Rate: $pps/s'));
+    lines.add(
+      _pad(' Input:   $inputPackets pkts  $inputPps/s'),
+    );
+    lines.add(
+      _pad(' Display: $displayWindowCount sent  $displayUps/s'),
+    );
     final path = pendant.readDevice.path;
     final maxP = _w - 8;
     final dp =
@@ -248,21 +174,27 @@ void main() async {
     firstDraw = false;
   }
 
-  // Packets-per-second counter.
+  // Rates-per-second counter (1 Hz).
   Timer.periodic(const Duration(seconds: 1), (_) {
-    pps = windowCount;
-    windowCount = 0;
+    inputPps = inputWindowCount;
+    inputWindowCount = 0;
+    displayUps = displayWindowCount;
+    displayWindowCount = 0;
+    redraw();
   });
 
-  // Sweep timer.
-  Timer.periodic(const Duration(milliseconds: 750), (_) {
-    final step = sweep[si];
-    sweepLabel = '[${si + 1}/${sweep.length}] ${step.label}';
-    sweepUpdate = step.update;
-    if (step.mode != null) conn.motionMode = step.mode!;
-    conn.updateDisplay(step.update);
-    si = (si + 1) % sweep.length;
-    redraw();
+  // Display update at 125 Hz (8 ms interval).
+  Timer.periodic(const Duration(milliseconds: 8), (_) {
+    displayTick++;
+    displayWindowCount++;
+    axis1Value += 0.001;
+    if (axis1Value > 9999.0) axis1Value = 0.0;
+    conn.updateDisplay(DisplayUpdate(
+      axis1: axis1Value,
+      feedRate: 1000,
+      spindleSpeed: 12000,
+      coordinateSpace: CoordinateSpace.workpiece,
+    ));
   });
 
   // Graceful shutdown.
@@ -284,8 +216,8 @@ void main() async {
 
   sub = stream.listen(
     (state) {
-      packets++;
-      windowCount++;
+      inputPackets++;
+      inputWindowCount++;
       cumJog += state.jogDelta;
       lastState = state;
       redraw();
