@@ -4,6 +4,7 @@ description: >-
   (xHB04B, WHB04B-4, WHB04B-6). Decodes button, jog wheel, and selector
   events; encodes display updates.
 version: 0.1.1
+repository: https://github.com/repentsinner/mpg-pendant
 
 environment:
   sdk: '>=3.10.0 <4.0.0'
