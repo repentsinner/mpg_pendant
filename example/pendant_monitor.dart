@@ -1,7 +1,16 @@
 /// Combined CLI example: discovers a pendant, monitors input events in a
 /// fixed-position terminal box, and drives display updates at 125 Hz to
-/// test throughput. Axis 1 increments continuously so you can see the
-/// LCD refresh rate.
+/// test throughput. All three axes increment continuously so you can see
+/// the LCD refresh rate.
+///
+/// The ANSI display includes a 4-line LCD mockup matching the physical
+/// WHB04B layout, plus a hex dump of the protocol payload for debugging.
+///
+/// Known issue: feed rate and spindle speed values are encoded correctly
+/// (verified against LinuxCNC, Candle, and pedropaulovc/whb04b-6
+/// implementations) but display as 0 on some hardware revisions. The
+/// protocol bytes are non-zero on the wire; the device firmware ignores
+/// them. Axis coordinates and mode flags work fine on the same units.
 ///
 /// Uses raw ANSI escapes — no dart_console dependency.
 ///
@@ -40,6 +49,7 @@ String _rule(String l, String r, [String? title]) {
 }
 
 String _hex(int v) => '0x${v.toRadixString(16).toUpperCase()}';
+String _hex2(int v) => v.toRadixString(16).toUpperCase().padLeft(2, '0');
 
 // ── Jog selector labels ──────────────────────────────────────────────────────
 
@@ -62,6 +72,12 @@ const _continuousLabels = {
   JogSelector.position5: ' 100%',
   JogSelector.position6: ' Lead',
 };
+
+// ── LCD line-1 display modes ─────────────────────────────────────────────────
+
+/// The WHB04B LCD line 1 shows one value at a time. The mode switches
+/// based on the last relevant button press or the jog selector.
+enum _Line1Mode { step, continuous, feed, spindle }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
@@ -100,6 +116,12 @@ void main() async {
   var displayUps = 0;
   var displayWindowCount = 0;
   var axis1Value = 0.0;
+  var axis2Value = 0.0;
+  var axis3Value = 0.0;
+  var feedRate = 0;
+  var spindleSpeed = 0;
+  var line1Mode = _Line1Mode.step;
+  DisplayUpdate? lastSentUpdate;
 
   // Track total lines drawn so we can rewind cursor.
   var lineCount = 0;
@@ -120,10 +142,14 @@ void main() async {
     final btns = [b1, b2].where((s) => s.isNotEmpty).join(' + ');
     lines.add(_pad(' Buttons: ${btns.isEmpty ? '(none)' : btns}'));
 
-    final axisBuf = StringBuffer(' Axis:    ');
+    final axisBuf = StringBuffer(' Axis:   ');
     for (final a in PendantAxis.values) {
-      final sel = lastState.axis == a ? '*' : '.';
-      axisBuf.write('$sel${a.name.toUpperCase()} ');
+      final label = a.name.toUpperCase();
+      if (lastState.axis == a) {
+        axisBuf.write('[$label]');
+      } else {
+        axisBuf.write(' $label ');
+      }
     }
     lines.add(_pad(axisBuf.toString()));
 
@@ -153,12 +179,66 @@ void main() async {
     lines.add(_pad(' Mode:    ${conn.motionMode.name}'));
     lines.add(_pad(''));
 
-    // -- Display output section --
-    lines.add(_pad(' -- Display Output (125 Hz target) ------'));
-    lines.add(_pad(
-      ' Ax1: ${axis1Value.toStringAsFixed(4).padLeft(12)}'
-      '  (tick $displayTick)',
-    ));
+    // -- LCD mockup (4 lines matching WHB04B physical display) --
+    lines.add(_pad(' -- LCD Output --'));
+    final String line1;
+    switch (line1Mode) {
+      case _Line1Mode.feed:
+        line1 = 'F:$feedRate';
+      case _Line1Mode.spindle:
+        line1 = 'S:$spindleSpeed';
+      case _Line1Mode.step:
+        final sv = lastState.jogSelector.stepValue;
+        line1 = sv != null ? 'STP:${sv.toStringAsFixed(3)}' : 'STP:Lead';
+      case _Line1Mode.continuous:
+        final cp = lastState.jogSelector.continuousPercent;
+        line1 = cp != null ? 'CON:$cp%' : 'CON:Lead';
+    }
+    lines.add(_pad('   $line1'));
+
+    final abcGroup = const {PendantAxis.a, PendantAxis.b, PendantAxis.c};
+    final useAbc = abcGroup.contains(lastState.axis);
+    final labels = useAbc ? ['A', 'B', 'C'] : ['X', 'Y', 'Z'];
+    final axes = useAbc
+        ? [PendantAxis.a, PendantAxis.b, PendantAxis.c]
+        : [PendantAxis.x, PendantAxis.y, PendantAxis.z];
+    final values = [axis1Value, axis2Value, axis3Value];
+    for (var i = 0; i < 3; i++) {
+      final marker = lastState.axis == axes[i] ? '*' : ' ';
+      final coord = values[i].toStringAsFixed(4).padLeft(12);
+      lines.add(_pad('  $marker${labels[i]}1: $coord'));
+    }
+    // -- Protocol hex dump (21-byte display payload) --
+    if (lastSentUpdate != null) {
+      final p = encodeDisplayPayload(DisplayUpdate(
+        axis1: lastSentUpdate!.axis1,
+        axis2: lastSentUpdate!.axis2,
+        axis3: lastSentUpdate!.axis3,
+        feedRate: lastSentUpdate!.feedRate,
+        spindleSpeed: lastSentUpdate!.spindleSpeed,
+        mode: conn.motionMode,
+        resetFlag: lastSentUpdate!.resetFlag,
+        coordinateSpace: lastSentUpdate!.coordinateSpace,
+      ));
+      String h(int i) => _hex2(p[i]);
+      lines.add(_pad(
+        '  hdr: ${h(0)} ${h(1)} ${h(2)}'
+        '  flags: ${h(3)}',
+      ));
+      lines.add(_pad(
+        '  ax1: ${h(4)} ${h(5)} ${h(6)} ${h(7)}'
+        '  ax2: ${h(8)} ${h(9)} ${h(10)} ${h(11)}',
+      ));
+      lines.add(_pad(
+        '  ax3: ${h(12)} ${h(13)} ${h(14)} ${h(15)}'
+        '  feed: ${h(16)} ${h(17)}'
+        '  spin: ${h(18)} ${h(19)}',
+      ));
+    } else {
+      lines.add(_pad('  (no payload yet)'));
+      lines.add(_pad(''));
+      lines.add(_pad(''));
+    }
     lines.add(_pad(''));
 
     // -- Stats --
@@ -166,7 +246,7 @@ void main() async {
       _pad(' Input:   $inputPackets pkts  $inputPps/s'),
     );
     lines.add(
-      _pad(' Display: $displayWindowCount sent  $displayUps/s'),
+      _pad(' Display: $displayWindowCount sent  $displayUps/s  tick $displayTick'),
     );
     final r = pendant.readDevice;
     final w = pendant.writeDevice;
@@ -213,12 +293,20 @@ void main() async {
     displayWindowCount++;
     axis1Value += 0.001;
     if (axis1Value > 9999.0) axis1Value = 0.0;
-    conn.updateDisplay(DisplayUpdate(
+    axis2Value += 0.002;
+    if (axis2Value > 9999.0) axis2Value = 0.0;
+    axis3Value += 0.003;
+    if (axis3Value > 9999.0) axis3Value = 0.0;
+    final update = DisplayUpdate(
       axis1: axis1Value,
-      feedRate: 1000,
-      spindleSpeed: 12000,
+      axis2: axis2Value,
+      axis3: axis3Value,
+      feedRate: feedRate,
+      spindleSpeed: spindleSpeed,
       coordinateSpace: CoordinateSpace.workpiece,
-    ));
+    );
+    lastSentUpdate = update;
+    if (conn.isOpen) conn.updateDisplay(update);
   });
 
   // Graceful shutdown.
@@ -245,6 +333,31 @@ void main() async {
       inputPackets++;
       inputWindowCount++;
       cumJog += state.jogDelta;
+
+      // Handle feed/spindle buttons.
+      for (final btn in [state.button1, state.button2]) {
+        switch (btn) {
+          case PendantButton.feedPlus:
+            feedRate = (feedRate + 100).clamp(0, 99999);
+            line1Mode = _Line1Mode.feed;
+          case PendantButton.feedMinus:
+            feedRate = (feedRate - 100).clamp(0, 99999);
+            line1Mode = _Line1Mode.feed;
+          case PendantButton.spindlePlus:
+            spindleSpeed = (spindleSpeed + 1000).clamp(0, 99999);
+            line1Mode = _Line1Mode.spindle;
+          case PendantButton.spindleMinus:
+            spindleSpeed = (spindleSpeed - 1000).clamp(0, 99999);
+            line1Mode = _Line1Mode.spindle;
+          case PendantButton.step:
+            line1Mode = _Line1Mode.step;
+          case PendantButton.continuous:
+            line1Mode = _Line1Mode.continuous;
+          default:
+            break;
+        }
+      }
+
       lastState = state;
       redraw();
     },
