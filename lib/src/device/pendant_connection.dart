@@ -8,6 +8,7 @@ import '../protocol/input_packet.dart';
 import '../protocol/models.dart';
 import 'hid_backend.dart';
 import 'hid_worker.dart';
+import 'hidapi_hid_backend.dart';
 import 'isolate_messages.dart';
 import 'pendant_discovery.dart';
 
@@ -25,16 +26,16 @@ import 'pendant_discovery.dart';
 class PendantConnection {
   /// Production constructor — spawns a worker isolate for HID I/O.
   PendantConnection(this._pendant, {this.fnInverted = true})
-      : _backend = null,
-        _useIsolate = true;
+    : _backend = null,
+      _useIsolate = true;
 
   /// Test constructor — runs HID I/O synchronously on the main isolate.
   PendantConnection.withBackend(
     HidBackend backend,
     this._pendant, {
     this.fnInverted = true,
-  })  : _backend = backend,
-        _useIsolate = false;
+  }) : _backend = backend,
+       _useIsolate = false;
 
   final HidBackend? _backend;
   final PendantDeviceInfo _pendant;
@@ -63,6 +64,10 @@ class PendantConnection {
   ReceivePort? _eventPort;
   Completer<void>? _stoppedCompleter;
 
+  // Main-isolate write handle (used when _useIsolate is true).
+  HidapiHidBackend? _writeBackend;
+  HidDeviceHandle? _isolateWriteHandle;
+
   /// Whether the connection is currently open.
   bool get isOpen => _useIsolate ? _isolate != null : _readHandle != null;
 
@@ -75,9 +80,7 @@ class PendantConnection {
       throw StateError('Connection already open');
     }
 
-    _controller = StreamController<PendantState>(
-      onCancel: () => close(),
-    );
+    _controller = StreamController<PendantState>(onCancel: () => close());
 
     if (_useIsolate) {
       await _openIsolate();
@@ -113,10 +116,14 @@ class PendantConnection {
       }
     });
 
+    // Open write handle on the main isolate so display writes don't
+    // contend with the worker's read loop.
+    _writeBackend = HidapiHidBackend();
+    _isolateWriteHandle = _writeBackend!.open(_pendant.writeDevice.path);
+
     final startup = WorkerStartup(
       sendPort: _eventPort!.sendPort,
       readDevicePath: _pendant.readDevice.path,
-      writeDevicePath: _pendant.writeDevice.path,
     );
 
     _isolate = await Isolate.spawn(hidWorkerEntryPoint, startup);
@@ -198,7 +205,10 @@ class PendantConnection {
     final reports = encodeDisplayUpdate(effective);
 
     if (_useIsolate) {
-      _commandPort!.send(WriteDisplayCommand(reports));
+      final handle = _isolateWriteHandle!;
+      for (final report in reports) {
+        _writeBackend!.sendFeatureReport(handle, report);
+      }
     } else {
       final handle = _writeHandle!;
       for (final report in reports) {
@@ -233,6 +243,24 @@ class PendantConnection {
   // ── Isolate cleanup ────────────────────────────────────────────────────
 
   Future<void> _closeIsolate() async {
+    // Mark closed immediately so concurrent callers (e.g. display timer)
+    // see isOpen == false and stop writing.
+    final isolate = _isolate;
+    _isolate = null;
+
+    // Close the main-isolate write handle while the hidapi library is
+    // still alive. The worker's cleanup calls hidExit(), which tears
+    // down global state — any handle use after that segfaults.
+    if (_isolateWriteHandle != null) {
+      try {
+        _writeBackend?.close(_isolateWriteHandle!);
+      } catch (_) {}
+      _isolateWriteHandle = null;
+    }
+    // Don't dispose _writeBackend (which calls hidExit) — the worker's
+    // cleanup handles library teardown.
+    _writeBackend = null;
+
     if (_commandPort != null) {
       _commandPort!.send(ShutdownCommand());
       // Wait for worker to stop, with timeout.
@@ -241,8 +269,7 @@ class PendantConnection {
         onTimeout: () {},
       );
     }
-    _isolate?.kill(priority: Isolate.beforeNextEvent);
-    _isolate = null;
+    isolate?.kill(priority: Isolate.beforeNextEvent);
     _commandPort = null;
     _eventPort?.close();
     _eventPort = null;
@@ -313,21 +340,19 @@ class PendantConnection {
         button1: b1,
         button2: b2,
         axis: raw.axis,
-        feed: raw.feed,
+        jogSelector: raw.jogSelector,
         jogDelta: raw.jogDelta,
       );
     }
 
-    final partner = raw.button1 == PendantButton.fn
-        ? raw.button2
-        : raw.button1;
+    final partner = raw.button1 == PendantButton.fn ? raw.button2 : raw.button1;
 
     if (partner == PendantButton.none) {
       return PendantState(
         button1: PendantButton.fn,
         button2: PendantButton.none,
         axis: raw.axis,
-        feed: raw.feed,
+        jogSelector: raw.jogSelector,
         jogDelta: raw.jogDelta,
       );
     }
@@ -347,7 +372,7 @@ class PendantConnection {
       button1: interpreted,
       button2: PendantButton.none,
       axis: raw.axis,
-      feed: raw.feed,
+      jogSelector: raw.jogSelector,
       jogDelta: raw.jogDelta,
     );
   }

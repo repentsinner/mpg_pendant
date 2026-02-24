@@ -10,7 +10,10 @@ import 'hid_backend.dart';
 /// On Windows the device enumerates as multiple HID collections —
 /// one for input and one for feature reports — so they may differ.
 class PendantDeviceInfo {
-  const PendantDeviceInfo({required this.readDevice, required this.writeDevice});
+  const PendantDeviceInfo({
+    required this.readDevice,
+    required this.writeDevice,
+  });
 
   /// Device for reading input reports (buttons, jog wheel, selectors).
   final HidDeviceInfo readDevice;

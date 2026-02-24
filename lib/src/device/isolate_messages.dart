@@ -6,7 +6,6 @@ class WorkerStartup {
   const WorkerStartup({
     required this.sendPort,
     required this.readDevicePath,
-    required this.writeDevicePath,
     this.readTimeoutMs = 100,
   });
 
@@ -16,23 +15,12 @@ class WorkerStartup {
   /// HID device path for input reads.
   final String readDevicePath;
 
-  /// HID device path for feature report writes.
-  final String writeDevicePath;
-
   /// Read timeout in milliseconds for the polling loop.
   final int readTimeoutMs;
 }
 
 /// Commands sent from the main isolate to the worker.
 sealed class WorkerCommand {}
-
-/// Encode display reports on the main isolate, send raw bytes to the worker.
-class WriteDisplayCommand extends WorkerCommand {
-  WriteDisplayCommand(this.reports);
-
-  /// Pre-encoded feature report buffers ready for [sendFeatureReport].
-  final List<Uint8List> reports;
-}
 
 /// Request a clean shutdown of the worker isolate.
 class ShutdownCommand extends WorkerCommand {}

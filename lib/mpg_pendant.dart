@@ -4,7 +4,11 @@ library;
 // Protocol layer — pure Dart, no I/O.
 export 'src/protocol/constants.dart';
 export 'src/protocol/display_encoder.dart'
-    show encodeCoordinate, encodeDisplayPayload, encodeDisplayUpdate, encodeFlags;
+    show
+        encodeCoordinate,
+        encodeDisplayPayload,
+        encodeDisplayUpdate,
+        encodeFlags;
 export 'src/protocol/input_packet.dart' show decodeInputPacket;
 export 'src/protocol/models.dart';
 

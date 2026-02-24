@@ -12,7 +12,7 @@ PendantState? decodeInputPacket(Uint8List data) {
 
   final button1 = PendantButton.fromCode(data[2]);
   final button2 = PendantButton.fromCode(data[3]);
-  final feed = FeedSelector.fromCode(data[4]);
+  final jogSelector = JogSelector.fromCode(data[4]);
   final axis = PendantAxis.fromCode(data[5]);
 
   // Jog delta is a signed 8-bit value at byte 6.
@@ -26,7 +26,7 @@ PendantState? decodeInputPacket(Uint8List data) {
     button1: button1,
     button2: button2,
     axis: axis,
-    feed: feed,
+    jogSelector: jogSelector,
     jogDelta: jogDelta,
   );
 }

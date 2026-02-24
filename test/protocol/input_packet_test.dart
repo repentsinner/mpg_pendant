@@ -14,7 +14,16 @@ Uint8List packet({
   int jog = 0x00,
   int checksum = 0x00,
 }) {
-  return Uint8List.fromList([header, seed, key1, key2, feed, axis, jog, checksum]);
+  return Uint8List.fromList([
+    header,
+    seed,
+    key1,
+    key2,
+    feed,
+    axis,
+    jog,
+    checksum,
+  ]);
 }
 
 void main() {
@@ -121,45 +130,53 @@ void main() {
       });
     });
 
-    group('feed/step selector', () {
-      final feedTests = <int, FeedSelector>{
-        0x0D: FeedSelector.step0001,
-        0x0E: FeedSelector.step001,
-        0x0F: FeedSelector.step01,
-        0x10: FeedSelector.step1,
-        0x1A: FeedSelector.step5,
-        0x1B: FeedSelector.step10,
-        0x1C: FeedSelector.lead,
+    group('jog selector', () {
+      final feedTests = <int, JogSelector>{
+        0x0D: JogSelector.position0,
+        0x0E: JogSelector.position1,
+        0x0F: JogSelector.position2,
+        0x10: JogSelector.position3,
+        0x1A: JogSelector.position4,
+        0x1B: JogSelector.position5,
+        0x1C: JogSelector.position6,
       };
 
       for (final entry in feedTests.entries) {
         test('code 0x${entry.key.toRadixString(16)} → ${entry.value.name}', () {
           final state = decodeInputPacket(packet(feed: entry.key));
-          expect(state!.feed, entry.value);
+          expect(state!.jogSelector, entry.value);
         });
       }
 
-      test('alternate lead code 0x9B maps to lead', () {
+      test('alternate lead code 0x9B maps to position6', () {
         final state = decodeInputPacket(packet(feed: 0x9B));
-        expect(state!.feed, FeedSelector.lead);
+        expect(state!.jogSelector, JogSelector.position6);
       });
 
       test('step mode values are correct', () {
-        expect(FeedSelector.step0001.stepValue, 0.001);
-        expect(FeedSelector.step001.stepValue, 0.01);
-        expect(FeedSelector.step01.stepValue, 0.1);
-        expect(FeedSelector.step1.stepValue, 1.0);
-        expect(FeedSelector.step5.stepValue, 5.0);
-        expect(FeedSelector.step10.stepValue, 10.0);
+        expect(JogSelector.position0.stepValue, 0.001);
+        expect(JogSelector.position1.stepValue, 0.01);
+        expect(JogSelector.position2.stepValue, 0.1);
+        expect(JogSelector.position3.stepValue, 1.0);
+        expect(JogSelector.position4.stepValue, 1.0);
+        expect(JogSelector.position5.stepValue, 1.0);
+        expect(JogSelector.position6.stepValue, isNull);
       });
 
       test('continuous mode percentages are correct', () {
-        expect(FeedSelector.step0001.continuousPercent, 2);
-        expect(FeedSelector.step001.continuousPercent, 5);
-        expect(FeedSelector.step01.continuousPercent, 10);
-        expect(FeedSelector.step1.continuousPercent, 30);
-        expect(FeedSelector.step5.continuousPercent, 60);
-        expect(FeedSelector.step10.continuousPercent, 100);
+        expect(JogSelector.position0.continuousPercent, 2);
+        expect(JogSelector.position1.continuousPercent, 5);
+        expect(JogSelector.position2.continuousPercent, 10);
+        expect(JogSelector.position3.continuousPercent, 30);
+        expect(JogSelector.position4.continuousPercent, 60);
+        expect(JogSelector.position5.continuousPercent, 100);
+        expect(JogSelector.position6.continuousPercent, isNull);
+      });
+
+      test('index getter returns ordinal position', () {
+        for (var i = 0; i < JogSelector.values.length; i++) {
+          expect(JogSelector.values[i].index, i);
+        }
       });
     });
 

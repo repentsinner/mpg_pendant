@@ -70,10 +70,12 @@ void main() {
 
   group('Flags encoding', () {
     test('continuous mode, machine coords, no reset', () {
-      final flags = encodeFlags(const DisplayUpdate(
-        mode: MotionMode.continuous,
-        coordinateSpace: CoordinateSpace.machine,
-      ));
+      final flags = encodeFlags(
+        const DisplayUpdate(
+          mode: MotionMode.continuous,
+          coordinateSpace: CoordinateSpace.machine,
+        ),
+      );
       expect(flags, 0x00);
     });
 
@@ -98,18 +100,20 @@ void main() {
     });
 
     test('workpiece coordinate space sets bit 7', () {
-      final flags = encodeFlags(const DisplayUpdate(
-        coordinateSpace: CoordinateSpace.workpiece,
-      ));
+      final flags = encodeFlags(
+        const DisplayUpdate(coordinateSpace: CoordinateSpace.workpiece),
+      );
       expect(flags & 0x80, 0x80);
     });
 
     test('all flags combined', () {
-      final flags = encodeFlags(const DisplayUpdate(
-        mode: MotionMode.step,
-        resetFlag: true,
-        coordinateSpace: CoordinateSpace.workpiece,
-      ));
+      final flags = encodeFlags(
+        const DisplayUpdate(
+          mode: MotionMode.step,
+          resetFlag: true,
+          coordinateSpace: CoordinateSpace.workpiece,
+        ),
+      );
       expect(flags, 0x01 | 0x40 | 0x80); // 0xC1
     });
   });
@@ -128,19 +132,16 @@ void main() {
     });
 
     test('flags byte at offset 3', () {
-      final payload = encodeDisplayPayload(const DisplayUpdate(
-        mode: MotionMode.step,
-        resetFlag: true,
-      ));
+      final payload = encodeDisplayPayload(
+        const DisplayUpdate(mode: MotionMode.step, resetFlag: true),
+      );
       expect(payload[3], 0x01 | 0x40);
     });
 
     test('coordinates placed at correct offsets', () {
-      final payload = encodeDisplayPayload(const DisplayUpdate(
-        axis1: 1.0,
-        axis2: 2.0,
-        axis3: 3.0,
-      ));
+      final payload = encodeDisplayPayload(
+        const DisplayUpdate(axis1: 1.0, axis2: 2.0, axis3: 3.0),
+      );
       // axis1 at offset 4: 1.0 → [0x01, 0x00, 0x00, 0x00]
       expect(payload[4], 0x01);
       expect(payload[5], 0x00);
@@ -169,11 +170,13 @@ void main() {
     });
 
     test('padding byte 20 is zero', () {
-      final payload = encodeDisplayPayload(const DisplayUpdate(
-        axis1: 999.999,
-        feedRate: 65535,
-        spindleSpeed: 65535,
-      ));
+      final payload = encodeDisplayPayload(
+        const DisplayUpdate(
+          axis1: 999.999,
+          feedRate: 65535,
+          spindleSpeed: 65535,
+        ),
+      );
       expect(payload[20], 0);
     });
   });
@@ -228,8 +231,11 @@ void main() {
 
       // First 21 bytes should match the payload
       for (var i = 0; i < 21; i++) {
-        expect(reconstructed[i], payload[i],
-            reason: 'Mismatch at payload byte $i');
+        expect(
+          reconstructed[i],
+          payload[i],
+          reason: 'Mismatch at payload byte $i',
+        );
       }
     });
   });
