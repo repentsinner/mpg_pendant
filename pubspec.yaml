@@ -3,7 +3,7 @@ description: >-
   Cross-platform USB HID driver for XHC WHB04B-family CNC pendants
   (xHB04B, WHB04B-4, WHB04B-6). Decodes button, jog wheel, and selector
   events; encodes display updates.
-version: 0.1.2
+version: 0.1.3
 repository: https://github.com/repentsinner/mpg_pendant
 
 environment:
