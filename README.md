@@ -31,7 +31,7 @@ Add the dependency:
 dependencies:
   mpg_pendant:
     git:
-      url: https://github.com/repentsinner/mpg-pendant.git
+      url: https://github.com/repentsinner/mpg_pendant.git
 ```
 
 The native `hidapi` library builds automatically via Dart's
@@ -114,7 +114,7 @@ public API or device I/O layer.
 - [SPEC.md](SPEC.md) — design rationale and requirements
 - [Example app](example/example.dart) — terminal-based monitor
   that exercises all inputs and drives the display at 125 Hz
-- [Issue tracker](https://github.com/repentsinner/mpg-pendant/issues)
+- [Issue tracker](https://github.com/repentsinner/mpg_pendant/issues)
 
 This package is a pendant driver only. It does not implement grbl, serial
 communication, or machine control — the consuming application handles that.
