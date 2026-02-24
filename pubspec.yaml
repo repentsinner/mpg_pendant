@@ -12,7 +12,7 @@ dependencies:
   hidapi:
     git:
       url: https://github.com/repentsinner/hidapi.git
-      ref: 6c5ee4b
+      ref: 5a3e0ab66fb7c3807eb8a23f56128b63c80dc34c
 
 dev_dependencies:
   test: ^1.24.0
