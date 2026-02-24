@@ -123,13 +123,13 @@ void main() {
 
     group('feed/step selector', () {
       final feedTests = <int, FeedSelector>{
-        0x0D: FeedSelector.step0001,
-        0x0E: FeedSelector.step001,
-        0x0F: FeedSelector.step01,
-        0x10: FeedSelector.step1,
-        0x1A: FeedSelector.step5,
-        0x1B: FeedSelector.step10,
-        0x1C: FeedSelector.lead,
+        0x0D: FeedSelector.position0,
+        0x0E: FeedSelector.position1,
+        0x0F: FeedSelector.position2,
+        0x10: FeedSelector.position3,
+        0x1A: FeedSelector.position4,
+        0x1B: FeedSelector.position5,
+        0x1C: FeedSelector.position6,
       };
 
       for (final entry in feedTests.entries) {
@@ -139,27 +139,35 @@ void main() {
         });
       }
 
-      test('alternate lead code 0x9B maps to lead', () {
+      test('alternate lead code 0x9B maps to position6', () {
         final state = decodeInputPacket(packet(feed: 0x9B));
-        expect(state!.feed, FeedSelector.lead);
+        expect(state!.feed, FeedSelector.position6);
       });
 
       test('step mode values are correct', () {
-        expect(FeedSelector.step0001.stepValue, 0.001);
-        expect(FeedSelector.step001.stepValue, 0.01);
-        expect(FeedSelector.step01.stepValue, 0.1);
-        expect(FeedSelector.step1.stepValue, 1.0);
-        expect(FeedSelector.step5.stepValue, 5.0);
-        expect(FeedSelector.step10.stepValue, 10.0);
+        expect(FeedSelector.position0.stepValue, 0.001);
+        expect(FeedSelector.position1.stepValue, 0.01);
+        expect(FeedSelector.position2.stepValue, 0.1);
+        expect(FeedSelector.position3.stepValue, 1.0);
+        expect(FeedSelector.position4.stepValue, 1.0);
+        expect(FeedSelector.position5.stepValue, 1.0);
+        expect(FeedSelector.position6.stepValue, isNull);
       });
 
       test('continuous mode percentages are correct', () {
-        expect(FeedSelector.step0001.continuousPercent, 2);
-        expect(FeedSelector.step001.continuousPercent, 5);
-        expect(FeedSelector.step01.continuousPercent, 10);
-        expect(FeedSelector.step1.continuousPercent, 30);
-        expect(FeedSelector.step5.continuousPercent, 60);
-        expect(FeedSelector.step10.continuousPercent, 100);
+        expect(FeedSelector.position0.continuousPercent, 2);
+        expect(FeedSelector.position1.continuousPercent, 5);
+        expect(FeedSelector.position2.continuousPercent, 10);
+        expect(FeedSelector.position3.continuousPercent, 30);
+        expect(FeedSelector.position4.continuousPercent, 60);
+        expect(FeedSelector.position5.continuousPercent, 100);
+        expect(FeedSelector.position6.continuousPercent, isNull);
+      });
+
+      test('index getter returns ordinal position', () {
+        for (var i = 0; i < FeedSelector.values.length; i++) {
+          expect(FeedSelector.values[i].index, i);
+        }
       });
     });
 

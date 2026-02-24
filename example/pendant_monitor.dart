@@ -43,14 +43,24 @@ String _hex(int v) => '0x${v.toRadixString(16).toUpperCase()}';
 
 // ── Feed selector labels ─────────────────────────────────────────────────────
 
-const _feedLabel = {
-  FeedSelector.step0001: '0.001',
-  FeedSelector.step001: ' 0.01',
-  FeedSelector.step01: '  0.1',
-  FeedSelector.step1: '  1.0',
-  FeedSelector.step5: '  5.0',
-  FeedSelector.step10: ' 10.0',
-  FeedSelector.lead: ' Lead',
+const _stepLabels = {
+  FeedSelector.position0: '0.001',
+  FeedSelector.position1: ' 0.01',
+  FeedSelector.position2: '  0.1',
+  FeedSelector.position3: '  1.0',
+  FeedSelector.position4: '  1.0',
+  FeedSelector.position5: '  1.0',
+  FeedSelector.position6: ' Lead',
+};
+
+const _continuousLabels = {
+  FeedSelector.position0: '   2%',
+  FeedSelector.position1: '   5%',
+  FeedSelector.position2: '  10%',
+  FeedSelector.position3: '  30%',
+  FeedSelector.position4: '  60%',
+  FeedSelector.position5: ' 100%',
+  FeedSelector.position6: ' Lead',
 };
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -77,7 +87,7 @@ void main() async {
     button1: PendantButton.none,
     button2: PendantButton.none,
     axis: PendantAxis.off,
-    feed: FeedSelector.step0001,
+    feed: FeedSelector.position0,
     jogDelta: 0,
   );
   var cumJog = 0;
@@ -117,8 +127,11 @@ void main() async {
     }
     lines.add(_pad(axisBuf.toString()));
 
+    final feedLabels = conn.motionMode == MotionMode.step
+        ? _stepLabels
+        : _continuousLabels;
     final feedBuf = StringBuffer(' Feed:   ');
-    for (final e in _feedLabel.entries) {
+    for (final e in feedLabels.entries) {
       if (lastState.feed == e.key) {
         feedBuf.write('[${e.value}]');
       } else {
@@ -186,7 +199,7 @@ void main() async {
   }
 
   // Rates-per-second counter (1 Hz).
-  Timer.periodic(const Duration(seconds: 1), (_) {
+  final statsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
     inputPps = inputWindowCount;
     inputWindowCount = 0;
     displayUps = displayWindowCount;
@@ -195,7 +208,7 @@ void main() async {
   });
 
   // Display update at 125 Hz (8 ms interval).
-  Timer.periodic(const Duration(milliseconds: 8), (_) {
+  final displayTimer = Timer.periodic(const Duration(milliseconds: 8), (_) {
     displayTick++;
     displayWindowCount++;
     axis1Value += 0.001;
@@ -215,6 +228,8 @@ void main() async {
   Future<void> cleanup() async {
     if (exiting) return;
     exiting = true;
+    displayTimer.cancel();
+    statsTimer.cancel();
     await sub.cancel();
     await conn.close();
     stdout.write(_showCursor);

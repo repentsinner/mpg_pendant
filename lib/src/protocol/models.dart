@@ -87,28 +87,41 @@ enum PendantAxis {
   }
 }
 
-/// Feed/step selector positions with dual interpretation.
+/// 7-position rotary feed selector.
+///
+/// Each position has mode-dependent meaning:
+/// - **Step mode**: [stepValue] is the jog increment in inches, as shown on
+///   the device firmware display. Positions 4–5 are blank on the faceplate;
+///   the firmware clamps their step display to 1.0.
+/// - **Continuous mode**: [continuousPercent] is the feed override percentage,
+///   matching the faceplate labels.
+/// - **Lead** (position 6): spindle-synchronous mode. Neither step size nor
+///   percentage applies; both fields are null.
 enum FeedSelector {
-  step0001(0x0D, 0.001, 2),
-  step001(0x0E, 0.01, 5),
-  step01(0x0F, 0.1, 10),
-  step1(0x10, 1.0, 30),
-  step5(0x1A, 5.0, 60),
-  step10(0x1B, 10.0, 100),
-  lead(0x1C, 0.0, 0);
+  position0(0x0D, 0.001, 2),
+  position1(0x0E, 0.01, 5),
+  position2(0x0F, 0.1, 10),
+  position3(0x10, 1.0, 30),
+  position4(0x1A, 1.0, 60),
+  position5(0x1B, 1.0, 100),
+  position6(0x1C, null, null);
 
   const FeedSelector(this.code, this.stepValue, this.continuousPercent);
   final int code;
-  final double stepValue;
-  final int continuousPercent;
+
+  /// Jog increment in inches, or null for Lead mode.
+  final double? stepValue;
+
+  /// Feed override percentage, or null for Lead mode.
+  final int? continuousPercent;
 
   static FeedSelector fromCode(int code) {
     // Handle alternate lead code from some firmware versions
-    if (code == 0x9B) return lead;
+    if (code == 0x9B) return position6;
     for (final value in values) {
       if (value.code == code) return value;
     }
-    return step0001;
+    return position0;
   }
 }
 

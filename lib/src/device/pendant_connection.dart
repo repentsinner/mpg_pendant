@@ -8,6 +8,7 @@ import '../protocol/input_packet.dart';
 import '../protocol/models.dart';
 import 'hid_backend.dart';
 import 'hid_worker.dart';
+import 'hidapi_hid_backend.dart';
 import 'isolate_messages.dart';
 import 'pendant_discovery.dart';
 
@@ -63,6 +64,10 @@ class PendantConnection {
   ReceivePort? _eventPort;
   Completer<void>? _stoppedCompleter;
 
+  // Main-isolate write handle (used when _useIsolate is true).
+  HidapiHidBackend? _writeBackend;
+  HidDeviceHandle? _isolateWriteHandle;
+
   /// Whether the connection is currently open.
   bool get isOpen => _useIsolate ? _isolate != null : _readHandle != null;
 
@@ -113,10 +118,14 @@ class PendantConnection {
       }
     });
 
+    // Open write handle on the main isolate so display writes don't
+    // contend with the worker's read loop.
+    _writeBackend = HidapiHidBackend();
+    _isolateWriteHandle = _writeBackend!.open(_pendant.writeDevice.path);
+
     final startup = WorkerStartup(
       sendPort: _eventPort!.sendPort,
       readDevicePath: _pendant.readDevice.path,
-      writeDevicePath: _pendant.writeDevice.path,
     );
 
     _isolate = await Isolate.spawn(hidWorkerEntryPoint, startup);
@@ -198,7 +207,10 @@ class PendantConnection {
     final reports = encodeDisplayUpdate(effective);
 
     if (_useIsolate) {
-      _commandPort!.send(WriteDisplayCommand(reports));
+      final handle = _isolateWriteHandle!;
+      for (final report in reports) {
+        _writeBackend!.sendFeatureReport(handle, report);
+      }
     } else {
       final handle = _writeHandle!;
       for (final report in reports) {
@@ -233,6 +245,24 @@ class PendantConnection {
   // ── Isolate cleanup ────────────────────────────────────────────────────
 
   Future<void> _closeIsolate() async {
+    // Mark closed immediately so concurrent callers (e.g. display timer)
+    // see isOpen == false and stop writing.
+    final isolate = _isolate;
+    _isolate = null;
+
+    // Close the main-isolate write handle while the hidapi library is
+    // still alive. The worker's cleanup calls hidExit(), which tears
+    // down global state — any handle use after that segfaults.
+    if (_isolateWriteHandle != null) {
+      try {
+        _writeBackend?.close(_isolateWriteHandle!);
+      } catch (_) {}
+      _isolateWriteHandle = null;
+    }
+    // Don't dispose _writeBackend (which calls hidExit) — the worker's
+    // cleanup handles library teardown.
+    _writeBackend = null;
+
     if (_commandPort != null) {
       _commandPort!.send(ShutdownCommand());
       // Wait for worker to stop, with timeout.
@@ -241,8 +271,7 @@ class PendantConnection {
         onTimeout: () {},
       );
     }
-    _isolate?.kill(priority: Isolate.beforeNextEvent);
-    _isolate = null;
+    isolate?.kill(priority: Isolate.beforeNextEvent);
     _commandPort = null;
     _eventPort?.close();
     _eventPort = null;
