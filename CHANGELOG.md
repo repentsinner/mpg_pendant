@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/repentsinner/mpg_pendant/compare/mpg_pendant-v0.1.2...mpg_pendant-v0.1.3) (2026-02-24)
+
+
+### Miscellaneous Chores
+
+* force release for pub.dev URL correction ([#13](https://github.com/repentsinner/mpg_pendant/issues/13)) ([0c02478](https://github.com/repentsinner/mpg_pendant/commit/0c02478d6c78bce33ed6ddabb25a8ce4bff7da3c))
+
 ## [0.1.2](https://github.com/repentsinner/mpg-pendant/compare/mpg_pendant-v0.1.1...mpg_pendant-v0.1.2) (2026-02-24)
 
 
