@@ -342,7 +342,7 @@ class PendantConnection {
         button1: b1,
         button2: b2,
         axis: raw.axis,
-        feed: raw.feed,
+        jogSelector: raw.jogSelector,
         jogDelta: raw.jogDelta,
       );
     }
@@ -356,7 +356,7 @@ class PendantConnection {
         button1: PendantButton.fn,
         button2: PendantButton.none,
         axis: raw.axis,
-        feed: raw.feed,
+        jogSelector: raw.jogSelector,
         jogDelta: raw.jogDelta,
       );
     }
@@ -376,7 +376,7 @@ class PendantConnection {
       button1: interpreted,
       button2: PendantButton.none,
       axis: raw.axis,
-      feed: raw.feed,
+      jogSelector: raw.jogSelector,
       jogDelta: raw.jogDelta,
     );
   }

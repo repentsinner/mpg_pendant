@@ -97,7 +97,7 @@ enum PendantAxis {
 ///   matching the faceplate labels.
 /// - **Lead** (position 6): spindle-synchronous mode. Neither step size nor
 ///   percentage applies; both fields are null.
-enum FeedSelector {
+enum JogSelector {
   position0(0x0D, 0.001, 2),
   position1(0x0E, 0.01, 5),
   position2(0x0F, 0.1, 10),
@@ -106,7 +106,7 @@ enum FeedSelector {
   position5(0x1B, 1.0, 100),
   position6(0x1C, null, null);
 
-  const FeedSelector(this.code, this.stepValue, this.continuousPercent);
+  const JogSelector(this.code, this.stepValue, this.continuousPercent);
   final int code;
 
   /// Jog increment in inches, or null for Lead mode.
@@ -115,7 +115,7 @@ enum FeedSelector {
   /// Feed override percentage, or null for Lead mode.
   final int? continuousPercent;
 
-  static FeedSelector fromCode(int code) {
+  static JogSelector fromCode(int code) {
     // Handle alternate lead code from some firmware versions
     if (code == 0x9B) return position6;
     for (final value in values) {
@@ -151,14 +151,14 @@ class PendantState {
     required this.button1,
     required this.button2,
     required this.axis,
-    required this.feed,
+    required this.jogSelector,
     required this.jogDelta,
   });
 
   final PendantButton button1;
   final PendantButton button2;
   final PendantAxis axis;
-  final FeedSelector feed;
+  final JogSelector jogSelector;
 
   /// Signed jog wheel delta (-128..+127). Zero when axis is OFF.
   final int jogDelta;
@@ -170,16 +170,17 @@ class PendantState {
           button1 == other.button1 &&
           button2 == other.button2 &&
           axis == other.axis &&
-          feed == other.feed &&
+          jogSelector == other.jogSelector &&
           jogDelta == other.jogDelta;
 
   @override
-  int get hashCode => Object.hash(button1, button2, axis, feed, jogDelta);
+  int get hashCode =>
+      Object.hash(button1, button2, axis, jogSelector, jogDelta);
 
   @override
   String toString() =>
       'PendantState(button1: $button1, button2: $button2, '
-      'axis: $axis, feed: $feed, jogDelta: $jogDelta)';
+      'axis: $axis, jogSelector: $jogSelector, jogDelta: $jogDelta)';
 }
 
 /// Data to send to the pendant display.

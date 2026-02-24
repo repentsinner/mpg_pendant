@@ -9,7 +9,7 @@ Currently supports XHC WHB04B-family pendants (xHB04B, WHB04B-4, WHB04B-6).
 - **Device discovery** — enumerates connected pendants, consolidates
   platform-specific HID collections into a single logical device
 - **Input decoding** — buttons (with Fn modifier), 6-axis jog wheel,
-  feed/step selector, continuous/step mode tracking
+  jog selector, continuous/step mode tracking
 - **Display output** — axis coordinates, feed rate, spindle speed,
   coordinate space, and motion mode
 - **Non-blocking I/O** — HID reads run in a dedicated isolate
@@ -63,7 +63,7 @@ conn.sendResetSequence();
 stream.listen((PendantState state) {
   print('Button: ${state.button1}');
   print('Axis: ${state.axis}, Jog: ${state.jogDelta}');
-  print('Feed: ${state.feed}');
+  print('Jog: ${state.jogSelector}');
 });
 ```
 

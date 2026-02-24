@@ -25,7 +25,7 @@ String _moveUp(int n) => '$_esc[${n}A';
 
 // ── Box drawing (ASCII only for reliable column math) ────────────────────────
 
-const _w = 50; // inner content width
+const _w = 60; // inner content width
 
 String _pad(String s) {
   final t = s.length > _w ? s.substring(0, _w) : s.padRight(_w);
@@ -41,26 +41,26 @@ String _rule(String l, String r, [String? title]) {
 
 String _hex(int v) => '0x${v.toRadixString(16).toUpperCase()}';
 
-// ── Feed selector labels ─────────────────────────────────────────────────────
+// ── Jog selector labels ──────────────────────────────────────────────────────
 
 const _stepLabels = {
-  FeedSelector.position0: '0.001',
-  FeedSelector.position1: ' 0.01',
-  FeedSelector.position2: '  0.1',
-  FeedSelector.position3: '  1.0',
-  FeedSelector.position4: '  1.0',
-  FeedSelector.position5: '  1.0',
-  FeedSelector.position6: ' Lead',
+  JogSelector.position0: '0.001',
+  JogSelector.position1: ' 0.01',
+  JogSelector.position2: '  0.1',
+  JogSelector.position3: '  1.0',
+  JogSelector.position4: '  1.0',
+  JogSelector.position5: '  1.0',
+  JogSelector.position6: ' Lead',
 };
 
 const _continuousLabels = {
-  FeedSelector.position0: '   2%',
-  FeedSelector.position1: '   5%',
-  FeedSelector.position2: '  10%',
-  FeedSelector.position3: '  30%',
-  FeedSelector.position4: '  60%',
-  FeedSelector.position5: ' 100%',
-  FeedSelector.position6: ' Lead',
+  JogSelector.position0: '   2%',
+  JogSelector.position1: '   5%',
+  JogSelector.position2: '  10%',
+  JogSelector.position3: '  30%',
+  JogSelector.position4: '  60%',
+  JogSelector.position5: ' 100%',
+  JogSelector.position6: ' Lead',
 };
 
 // ── Main ─────────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ void main() async {
     button1: PendantButton.none,
     button2: PendantButton.none,
     axis: PendantAxis.off,
-    feed: FeedSelector.position0,
+    jogSelector: JogSelector.position0,
     jogDelta: 0,
   );
   var cumJog = 0;
@@ -127,18 +127,18 @@ void main() async {
     }
     lines.add(_pad(axisBuf.toString()));
 
-    final feedLabels = conn.motionMode == MotionMode.step
+    final jogLabels = conn.motionMode == MotionMode.step
         ? _stepLabels
         : _continuousLabels;
-    final feedBuf = StringBuffer(' Feed:   ');
-    for (final e in feedLabels.entries) {
-      if (lastState.feed == e.key) {
-        feedBuf.write('[${e.value}]');
+    final jogBuf = StringBuffer(' Jog:    ');
+    for (final e in jogLabels.entries) {
+      if (lastState.jogSelector == e.key) {
+        jogBuf.write('[${e.value}]');
       } else {
-        feedBuf.write(' ${e.value} ');
+        jogBuf.write(' ${e.value} ');
       }
     }
-    lines.add(_pad(feedBuf.toString()));
+    lines.add(_pad(jogBuf.toString()));
 
     String jogStr;
     if (lastState.jogDelta == 0) {
