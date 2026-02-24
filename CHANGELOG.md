@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.2](https://github.com/repentsinner/mpg-pendant/compare/mpg_pendant-v0.1.1...mpg_pendant-v0.1.2) (2026-02-24)
+
+
+### Features
+
+* **example:** add LCD mockup, feed/spindle controls, and protocol hex dump ([905b37c](https://github.com/repentsinner/mpg-pendant/commit/905b37c1993d5512d1b9f08472a7c0b62002aed0))
+* **monitor:** show HID collection metadata, bump hidapi ([6338138](https://github.com/repentsinner/mpg-pendant/commit/633813896a9e4cdedb8db2f665fee439d44ee7f6))
+* **monitor:** show HID collection metadata, bump hidapi ([605763a](https://github.com/repentsinner/mpg-pendant/commit/605763adc73b6ee87323599e674f62f937ca0a7e))
+
 ## [0.1.1](https://github.com/repentsinner/mpg-pendant/compare/mpg_pendant-v0.1.0...mpg_pendant-v0.1.1) (2026-02-23)
 
 
