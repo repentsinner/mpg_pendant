@@ -10,10 +10,7 @@ environment:
   sdk: '>=3.10.0 <4.0.0'
 
 dependencies:
-  hidapi:
-    git:
-      url: https://github.com/repentsinner/hidapi.git
-      ref: 5a3e0ab66fb7c3807eb8a23f56128b63c80dc34c
+  hidapi: ^0.1.1
 
 dev_dependencies:
   test: ^1.24.0
