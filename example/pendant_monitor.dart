@@ -210,30 +210,38 @@ void main() async {
     }
     // -- Protocol hex dump (21-byte display payload) --
     if (lastSentUpdate != null) {
-      final p = encodeDisplayPayload(DisplayUpdate(
-        axis1: lastSentUpdate!.axis1,
-        axis2: lastSentUpdate!.axis2,
-        axis3: lastSentUpdate!.axis3,
-        feedRate: lastSentUpdate!.feedRate,
-        spindleSpeed: lastSentUpdate!.spindleSpeed,
-        mode: conn.motionMode,
-        resetFlag: lastSentUpdate!.resetFlag,
-        coordinateSpace: lastSentUpdate!.coordinateSpace,
-      ));
+      final p = encodeDisplayPayload(
+        DisplayUpdate(
+          axis1: lastSentUpdate!.axis1,
+          axis2: lastSentUpdate!.axis2,
+          axis3: lastSentUpdate!.axis3,
+          feedRate: lastSentUpdate!.feedRate,
+          spindleSpeed: lastSentUpdate!.spindleSpeed,
+          mode: conn.motionMode,
+          resetFlag: lastSentUpdate!.resetFlag,
+          coordinateSpace: lastSentUpdate!.coordinateSpace,
+        ),
+      );
       String h(int i) => _hex2(p[i]);
-      lines.add(_pad(
-        '  hdr: ${h(0)} ${h(1)} ${h(2)}'
-        '  flags: ${h(3)}',
-      ));
-      lines.add(_pad(
-        '  ax1: ${h(4)} ${h(5)} ${h(6)} ${h(7)}'
-        '  ax2: ${h(8)} ${h(9)} ${h(10)} ${h(11)}',
-      ));
-      lines.add(_pad(
-        '  ax3: ${h(12)} ${h(13)} ${h(14)} ${h(15)}'
-        '  feed: ${h(16)} ${h(17)}'
-        '  spin: ${h(18)} ${h(19)}',
-      ));
+      lines.add(
+        _pad(
+          '  hdr: ${h(0)} ${h(1)} ${h(2)}'
+          '  flags: ${h(3)}',
+        ),
+      );
+      lines.add(
+        _pad(
+          '  ax1: ${h(4)} ${h(5)} ${h(6)} ${h(7)}'
+          '  ax2: ${h(8)} ${h(9)} ${h(10)} ${h(11)}',
+        ),
+      );
+      lines.add(
+        _pad(
+          '  ax3: ${h(12)} ${h(13)} ${h(14)} ${h(15)}'
+          '  feed: ${h(16)} ${h(17)}'
+          '  spin: ${h(18)} ${h(19)}',
+        ),
+      );
     } else {
       lines.add(_pad('  (no payload yet)'));
       lines.add(_pad(''));
@@ -242,26 +250,30 @@ void main() async {
     lines.add(_pad(''));
 
     // -- Stats --
+    lines.add(_pad(' Input:   $inputPackets pkts  $inputPps/s'));
     lines.add(
-      _pad(' Input:   $inputPackets pkts  $inputPps/s'),
-    );
-    lines.add(
-      _pad(' Display: $displayWindowCount sent  $displayUps/s  tick $displayTick'),
+      _pad(
+        ' Display: $displayWindowCount sent  $displayUps/s  tick $displayTick',
+      ),
     );
     final r = pendant.readDevice;
     final w = pendant.writeDevice;
-    lines.add(_pad(
-      ' Read:  VID:${r.vendorId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
-      ' PID:${r.productId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
-      ' page:${_hex(r.usagePage)} usage:${_hex(r.usage)}'
-      ' iface:${r.interfaceNumber}',
-    ));
-    lines.add(_pad(
-      ' Write: VID:${w.vendorId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
-      ' PID:${w.productId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
-      ' page:${_hex(w.usagePage)} usage:${_hex(w.usage)}'
-      ' iface:${w.interfaceNumber}',
-    ));
+    lines.add(
+      _pad(
+        ' Read:  VID:${r.vendorId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+        ' PID:${r.productId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+        ' page:${_hex(r.usagePage)} usage:${_hex(r.usage)}'
+        ' iface:${r.interfaceNumber}',
+      ),
+    );
+    lines.add(
+      _pad(
+        ' Write: VID:${w.vendorId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+        ' PID:${w.productId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+        ' page:${_hex(w.usagePage)} usage:${_hex(w.usage)}'
+        ' iface:${w.interfaceNumber}',
+      ),
+    );
     lines.add(_rule('+', '+'));
 
     // Rewind cursor if not the first draw.

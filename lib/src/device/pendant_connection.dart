@@ -26,16 +26,16 @@ import 'pendant_discovery.dart';
 class PendantConnection {
   /// Production constructor — spawns a worker isolate for HID I/O.
   PendantConnection(this._pendant, {this.fnInverted = true})
-      : _backend = null,
-        _useIsolate = true;
+    : _backend = null,
+      _useIsolate = true;
 
   /// Test constructor — runs HID I/O synchronously on the main isolate.
   PendantConnection.withBackend(
     HidBackend backend,
     this._pendant, {
     this.fnInverted = true,
-  })  : _backend = backend,
-        _useIsolate = false;
+  }) : _backend = backend,
+       _useIsolate = false;
 
   final HidBackend? _backend;
   final PendantDeviceInfo _pendant;
@@ -80,9 +80,7 @@ class PendantConnection {
       throw StateError('Connection already open');
     }
 
-    _controller = StreamController<PendantState>(
-      onCancel: () => close(),
-    );
+    _controller = StreamController<PendantState>(onCancel: () => close());
 
     if (_useIsolate) {
       await _openIsolate();
@@ -347,9 +345,7 @@ class PendantConnection {
       );
     }
 
-    final partner = raw.button1 == PendantButton.fn
-        ? raw.button2
-        : raw.button1;
+    final partner = raw.button1 == PendantButton.fn ? raw.button2 : raw.button1;
 
     if (partner == PendantButton.none) {
       return PendantState(

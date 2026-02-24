@@ -80,20 +80,22 @@ PendantDeviceInfo _sameDevice(HidDeviceInfo dev) =>
 void main() {
   group('PendantDiscovery', () {
     test('finds devices matching VID/PID', () {
-      final backend = MockHidBackend(devices: [
-        const HidDeviceInfo(
-          vendorId: pendantVendorId,
-          productId: pendantProductId,
-          path: '/dev/hidraw0',
-          interfaceNumber: 0,
-        ),
-        const HidDeviceInfo(
-          vendorId: 0x1234,
-          productId: 0x5678,
-          path: '/dev/hidraw1',
-          interfaceNumber: 0,
-        ),
-      ]);
+      final backend = MockHidBackend(
+        devices: [
+          const HidDeviceInfo(
+            vendorId: pendantVendorId,
+            productId: pendantProductId,
+            path: '/dev/hidraw0',
+            interfaceNumber: 0,
+          ),
+          const HidDeviceInfo(
+            vendorId: 0x1234,
+            productId: 0x5678,
+            path: '/dev/hidraw1',
+            interfaceNumber: 0,
+          ),
+        ],
+      );
 
       final discovery = PendantDiscovery(backend);
       final pendants = discovery.findPendants();
@@ -108,20 +110,22 @@ void main() {
     });
 
     test('filters out devices with wrong interface number', () {
-      final backend = MockHidBackend(devices: [
-        const HidDeviceInfo(
-          vendorId: pendantVendorId,
-          productId: pendantProductId,
-          path: '/dev/hidraw0',
-          interfaceNumber: 0,
-        ),
-        const HidDeviceInfo(
-          vendorId: pendantVendorId,
-          productId: pendantProductId,
-          path: '/dev/hidraw1',
-          interfaceNumber: 1,
-        ),
-      ]);
+      final backend = MockHidBackend(
+        devices: [
+          const HidDeviceInfo(
+            vendorId: pendantVendorId,
+            productId: pendantProductId,
+            path: '/dev/hidraw0',
+            interfaceNumber: 0,
+          ),
+          const HidDeviceInfo(
+            vendorId: pendantVendorId,
+            productId: pendantProductId,
+            path: '/dev/hidraw1',
+            interfaceNumber: 1,
+          ),
+        ],
+      );
 
       final discovery = PendantDiscovery(backend);
       final pendants = discovery.findPendants();
@@ -132,63 +136,69 @@ void main() {
     });
 
     test('returns only devices on interface 0', () {
-      final backend = MockHidBackend(devices: [
-        const HidDeviceInfo(
-          vendorId: pendantVendorId,
-          productId: pendantProductId,
-          path: '/dev/hidraw0',
-          interfaceNumber: 1,
-        ),
-        const HidDeviceInfo(
-          vendorId: pendantVendorId,
-          productId: pendantProductId,
-          path: '/dev/hidraw1',
-          interfaceNumber: 2,
-        ),
-      ]);
-
-      final discovery = PendantDiscovery(backend);
-      expect(discovery.findPendants(), isEmpty);
-    });
-
-    test('probes and pairs collections when all interfaces match (Windows)',
-        () {
       final backend = MockHidBackend(
         devices: [
           const HidDeviceInfo(
             vendorId: pendantVendorId,
             productId: pendantProductId,
-            path: r'\\?\HID#Col01',
-            interfaceNumber: 0,
+            path: '/dev/hidraw0',
+            interfaceNumber: 1,
           ),
           const HidDeviceInfo(
             vendorId: pendantVendorId,
             productId: pendantProductId,
-            path: r'\\?\HID#Col02',
-            interfaceNumber: 0,
+            path: '/dev/hidraw1',
+            interfaceNumber: 2,
           ),
         ],
-        featureReportFailPaths: {r'\\?\HID#Col01'},
       );
 
       final discovery = PendantDiscovery(backend);
-      final pendants = discovery.findPendants();
-      expect(pendants.length, 1);
-      // Col01 should be the read device (feature reports fail there).
-      expect(pendants[0].readDevice.path, r'\\?\HID#Col01');
-      // Col02 should be the write device (feature reports succeed there).
-      expect(pendants[0].writeDevice.path, r'\\?\HID#Col02');
+      expect(discovery.findPendants(), isEmpty);
     });
 
+    test(
+      'probes and pairs collections when all interfaces match (Windows)',
+      () {
+        final backend = MockHidBackend(
+          devices: [
+            const HidDeviceInfo(
+              vendorId: pendantVendorId,
+              productId: pendantProductId,
+              path: r'\\?\HID#Col01',
+              interfaceNumber: 0,
+            ),
+            const HidDeviceInfo(
+              vendorId: pendantVendorId,
+              productId: pendantProductId,
+              path: r'\\?\HID#Col02',
+              interfaceNumber: 0,
+            ),
+          ],
+          featureReportFailPaths: {r'\\?\HID#Col01'},
+        );
+
+        final discovery = PendantDiscovery(backend);
+        final pendants = discovery.findPendants();
+        expect(pendants.length, 1);
+        // Col01 should be the read device (feature reports fail there).
+        expect(pendants[0].readDevice.path, r'\\?\HID#Col01');
+        // Col02 should be the write device (feature reports succeed there).
+        expect(pendants[0].writeDevice.path, r'\\?\HID#Col02');
+      },
+    );
+
     test('returns single device without probing', () {
-      final backend = MockHidBackend(devices: [
-        const HidDeviceInfo(
-          vendorId: pendantVendorId,
-          productId: pendantProductId,
-          path: '/dev/hidraw0',
-          interfaceNumber: 0,
-        ),
-      ]);
+      final backend = MockHidBackend(
+        devices: [
+          const HidDeviceInfo(
+            vendorId: pendantVendorId,
+            productId: pendantProductId,
+            path: '/dev/hidraw0',
+            interfaceNumber: 0,
+          ),
+        ],
+      );
 
       final discovery = PendantDiscovery(backend);
       final pendants = discovery.findPendants();
@@ -208,9 +218,7 @@ void main() {
             path: '/dev/hidraw0',
           ),
         ],
-        readQueue: [
-          _packet(key1: 0x03, axis: 0x12, jog: 5),
-        ],
+        readQueue: [_packet(key1: 0x03, axis: 0x12, jog: 5)],
       );
 
       final conn = PendantConnection.withBackend(
@@ -550,31 +558,33 @@ void main() {
         await conn.close();
       });
 
-      test('Fn + dual-label button reports function name, Fn stripped',
-          () async {
-        final backend = MockHidBackend(
-          devices: [
-            const HidDeviceInfo(
-              vendorId: pendantVendorId,
-              productId: pendantProductId,
-              path: '/dev/hidraw0',
-            ),
-          ],
-          readQueue: [
-            _packet(key1: 0x0C, key2: 0x04), // fn + feedPlus
-          ],
-        );
+      test(
+        'Fn + dual-label button reports function name, Fn stripped',
+        () async {
+          final backend = MockHidBackend(
+            devices: [
+              const HidDeviceInfo(
+                vendorId: pendantVendorId,
+                productId: pendantProductId,
+                path: '/dev/hidraw0',
+              ),
+            ],
+            readQueue: [
+              _packet(key1: 0x0C, key2: 0x04), // fn + feedPlus
+            ],
+          );
 
-        final conn = PendantConnection.withBackend(
-          backend,
-          _sameDevice(backend.devices.first),
-          fnInverted: false,
-        );
-        final state = await (await conn.open()).first;
-        expect(state.button1, PendantButton.feedPlus);
-        expect(state.button2, PendantButton.none);
-        await conn.close();
-      });
+          final conn = PendantConnection.withBackend(
+            backend,
+            _sameDevice(backend.devices.first),
+            fnInverted: false,
+          );
+          final state = await (await conn.open()).first;
+          expect(state.button1, PendantButton.feedPlus);
+          expect(state.button2, PendantButton.none);
+          await conn.close();
+        },
+      );
 
       test('Fn + dedicated button strips Fn', () async {
         final backend = MockHidBackend(
@@ -670,8 +680,7 @@ void main() {
         await conn.close();
       });
 
-      test('step button re-sends last display update with step mode',
-          () async {
+      test('step button re-sends last display update with step mode', () async {
         final backend = MockHidBackend(
           devices: [
             const HidDeviceInfo(

@@ -14,7 +14,16 @@ Uint8List packet({
   int jog = 0x00,
   int checksum = 0x00,
 }) {
-  return Uint8List.fromList([header, seed, key1, key2, feed, axis, jog, checksum]);
+  return Uint8List.fromList([
+    header,
+    seed,
+    key1,
+    key2,
+    feed,
+    axis,
+    jog,
+    checksum,
+  ]);
 }
 
 void main() {
