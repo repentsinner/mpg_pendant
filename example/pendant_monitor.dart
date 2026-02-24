@@ -39,6 +39,8 @@ String _rule(String l, String r, [String? title]) {
   return '$l${'-' * (_w + 2)}$r';
 }
 
+String _hex(int v) => '0x${v.toRadixString(16).toUpperCase()}';
+
 // ── Feed selector labels ─────────────────────────────────────────────────────
 
 const _feedLabel = {
@@ -153,11 +155,20 @@ void main() async {
     lines.add(
       _pad(' Display: $displayWindowCount sent  $displayUps/s'),
     );
-    final path = pendant.readDevice.path;
-    final maxP = _w - 8;
-    final dp =
-        path.length > maxP ? '${path.substring(0, maxP - 2)}..' : path;
-    lines.add(_pad(' Path: $dp'));
+    final r = pendant.readDevice;
+    final w = pendant.writeDevice;
+    lines.add(_pad(
+      ' Read:  VID:${r.vendorId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+      ' PID:${r.productId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+      ' page:${_hex(r.usagePage)} usage:${_hex(r.usage)}'
+      ' iface:${r.interfaceNumber}',
+    ));
+    lines.add(_pad(
+      ' Write: VID:${w.vendorId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+      ' PID:${w.productId.toRadixString(16).toUpperCase().padLeft(4, '0')}'
+      ' page:${_hex(w.usagePage)} usage:${_hex(w.usage)}'
+      ' iface:${w.interfaceNumber}',
+    ));
     lines.add(_rule('+', '+'));
 
     // Rewind cursor if not the first draw.
