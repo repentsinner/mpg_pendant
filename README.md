@@ -112,7 +112,7 @@ public API or device I/O layer.
 ## Additional information
 
 - [SPEC.md](SPEC.md) — design rationale and requirements
-- [Example app](example/pendant_monitor.dart) — terminal-based monitor
+- [Example app](example/example.dart) — terminal-based monitor
   that exercises all inputs and drives the display at 125 Hz
 - [Issue tracker](https://github.com/repentsinner/mpg-pendant/issues)
 

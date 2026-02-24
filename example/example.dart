@@ -14,7 +14,7 @@
 ///
 /// Uses raw ANSI escapes — no dart_console dependency.
 ///
-/// Usage: dart run example/pendant_monitor.dart
+/// Usage: dart run example/example.dart
 library;
 
 import 'dart:async';
