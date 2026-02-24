@@ -1,3 +1,5 @@
+# mpg_pendant
+
 Cross-platform USB HID driver for CNC MPG pendants. Decodes button presses,
 jog wheel movement, and selector positions into structured Dart objects.
 Encodes machine state back to the pendant's LCD display.
@@ -103,7 +105,7 @@ public API or device I/O layer.
 - **Linux** — you may need a udev rule to grant non-root access to the
   device. Example:
 
-  ```
+  ```text
   SUBSYSTEM=="hidraw", ATTRS{idVendor}=="10ce", MODE="0666"
   ```
 
