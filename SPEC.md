@@ -29,7 +29,12 @@ The architecture shall not be specific to any single pendant family. Adding
 support for a new pendant shall not require changes to device I/O or the
 public API.
 
-Currently tested with: XHC WHB04B-family (xHB04B, WHB04B-4, WHB04B-6).
+The XHC HB04B family comprises four variants: wired (LHB04B) and wireless
+(WHB04B), each in 4-axis and 6-axis configurations. All share USB VID/PID
+`10CE:EB93` and the same wire protocol.
+
+Tested with: LHB04B-4 (wired, 4-axis). Other HB04B variants are expected to
+work but have not been verified.
 
 Supported platforms: Windows, macOS, Linux (desktop only).
 

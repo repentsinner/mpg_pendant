@@ -4,7 +4,8 @@ Cross-platform USB HID driver for CNC MPG pendants. Decodes button presses,
 jog wheel movement, and selector positions into structured Dart objects.
 Encodes machine state back to the pendant's LCD display.
 
-Currently supports XHC WHB04B-family pendants (xHB04B, WHB04B-4, WHB04B-6).
+Currently supports XHC HB04B-family pendants — both wired (LHB04B) and
+wireless (WHB04B), in 4-axis and 6-axis variants.
 
 ## Features
 
@@ -92,7 +93,13 @@ await conn.close();
 
 | Family | Models | Interface |
 |--------|--------|-----------|
-| XHC WHB04B | xHB04B, WHB04B-4, WHB04B-6 | USB HID wireless dongle |
+| XHC HB04B | LHB04B-4, LHB04B-6 | USB HID (wired) |
+| XHC HB04B | WHB04B-4, WHB04B-6 | USB HID (wireless dongle) |
+
+All variants share USB VID/PID `10CE:EB93`.
+
+Tested with: LHB04B-4 (wired, 4-axis). Other HB04B variants use the same
+protocol and are expected to work but have not been verified.
 
 The architecture supports adding new pendant families without changing the
 public API or device I/O layer.

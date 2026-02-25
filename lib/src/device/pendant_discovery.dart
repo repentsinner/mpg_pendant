@@ -22,7 +22,7 @@ class PendantDeviceInfo {
   final HidDeviceInfo writeDevice;
 }
 
-/// Discovers connected WHB04B pendant dongles.
+/// Discovers connected HB04B-family pendants (wired or wireless).
 class PendantDiscovery {
   PendantDiscovery(this._backend);
 
