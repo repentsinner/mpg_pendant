@@ -98,8 +98,8 @@ await conn.close();
 
 All variants share USB VID/PID `10CE:EB93`.
 
-Tested with: LHB04B-4 (wired, 4-axis). Other HB04B variants use the same
-protocol and are expected to work but have not been verified.
+Tested with: LHB04B-4 (wired, 4-axis, firmware TX:V03). Other HB04B variants
+use the same protocol and are expected to work but have not been verified.
 
 The architecture supports adding new pendant families without changing the
 public API or device I/O layer.

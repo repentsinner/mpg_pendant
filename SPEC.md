@@ -33,8 +33,13 @@ The XHC HB04B family comprises four variants: wired (LHB04B) and wireless
 (WHB04B), each in 4-axis and 6-axis configurations. All share USB VID/PID
 `10CE:EB93` and the same wire protocol.
 
-Tested with: LHB04B-4 (wired, 4-axis). Other HB04B variants are expected to
-work but have not been verified.
+Tested with: LHB04B-4 (wired, 4-axis), firmware label TX:V03. Other HB04B
+variants are expected to work but have not been verified.
+
+The firmware version is printed on a physical label only. The USB descriptor
+exposes a manufacturer string ("KTURT.LTD") but no product string or serial
+number (`Product=0, SerialNumber=0`). No known HID report or USB descriptor
+field carries the firmware version at runtime.
 
 Supported platforms: Windows, macOS, Linux (desktop only).
 
