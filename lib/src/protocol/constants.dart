@@ -1,7 +1,7 @@
 /// USB Vendor ID for XHC/KTURT.LTD pendant dongles.
 const int pendantVendorId = 0x10CE;
 
-/// USB Product ID for HB04B-family pendants (LHB04B and WHB04B variants).
+/// USB Product ID for xHB04B-family pendants (LHB04B and WHB04B variants).
 const int pendantProductId = 0xEB93;
 
 /// HID interface number for input reports and feature reports.

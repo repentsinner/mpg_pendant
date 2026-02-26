@@ -4,13 +4,15 @@
 /// the LCD refresh rate.
 ///
 /// The ANSI display includes a 4-line LCD mockup matching the physical
-/// WHB04B layout, plus a hex dump of the protocol payload for debugging.
+/// xHB04B layout, plus a hex dump of the protocol payload for debugging.
 ///
 /// Known issue: feed rate and spindle speed values are encoded correctly
 /// (verified against LinuxCNC, Candle, and pedropaulovc/whb04b-6
 /// implementations) but display as 0 on some hardware revisions. The
 /// protocol bytes are non-zero on the wire; the device firmware ignores
 /// them. Axis coordinates and mode flags work fine on the same units.
+///
+/// Reconnects automatically if the device is disconnected.
 ///
 /// Uses raw ANSI escapes — no dart_console dependency.
 ///
@@ -75,28 +77,90 @@ const _continuousLabels = {
 
 // ── LCD line-1 display modes ─────────────────────────────────────────────────
 
-/// The WHB04B LCD line 1 shows one value at a time. The mode switches
+/// The xHB04B LCD line 1 shows one value at a time. The mode switches
 /// based on the last relevant button press or the jog selector.
 enum _Line1Mode { step, continuous, feed, spindle }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 void main() async {
-  final backend = HidapiHidBackend();
-  final discovery = PendantDiscovery(backend);
+  stdout.write(_hideCursor);
 
-  final pendants = discovery.findPendants();
-  if (pendants.isEmpty) {
-    stderr.writeln('No pendant found. Is the USB dongle connected?');
-    exit(1);
+  // Ctrl-C handler.
+  var exiting = false;
+  ProcessSignal.sigint.watch().listen((_) {
+    stdout.write(_showCursor);
+    exiting = true;
+    exit(0);
+  });
+
+  // Track total lines drawn so we can rewind cursor across sessions.
+  var lineCount = 0;
+  var firstDraw = true;
+
+  void writeLines(List<String> lines) {
+    if (!firstDraw && lineCount > 0) {
+      stdout.write(_moveUp(lineCount));
+    }
+    for (final l in lines) {
+      stdout.write('$_clearLine\r$l\n');
+    }
+    lineCount = lines.length;
+    firstDraw = false;
   }
 
-  final pendant = pendants.first;
-  final conn = PendantConnection(pendant);
-  final stream = await conn.open();
-  conn.sendResetSequence();
+  void showStatus(String message) {
+    final lines = <String>[
+      _rule('+', '+', ' xHB04B Pendant '),
+      _pad(''),
+      _pad('  $message'),
+      _pad(''),
+      _rule('+', '+'),
+    ];
+    writeLines(lines);
+  }
 
-  stdout.write(_hideCursor);
+  // ── Reconnection loop ───────────────────────────────────────────────────
+
+  while (!exiting) {
+    // Discovery phase — poll until a pendant appears.
+    PendantDeviceInfo? pendant;
+    while (!exiting) {
+      final backend = HidapiHidBackend();
+      final discovery = PendantDiscovery(backend);
+      final pendants = discovery.findPendants();
+      if (pendants.isNotEmpty) {
+        pendant = pendants.first;
+        break;
+      }
+      showStatus('Waiting for pendant...');
+      await Future<void>.delayed(const Duration(seconds: 1));
+    }
+    if (exiting || pendant == null) break;
+
+    // Session phase — connected, running.
+    await _runSession(pendant, exiting, writeLines);
+  }
+
+  stdout.write(_showCursor);
+}
+
+/// Runs a single connected session. Returns when the device disconnects
+/// or an error occurs.
+Future<void> _runSession(
+  PendantDeviceInfo pendant,
+  bool exiting,
+  void Function(List<String> lines) writeLines,
+) async {
+  final conn = PendantConnection(pendant);
+  final Stream<PendantState> stream;
+  try {
+    stream = await conn.open();
+    conn.sendResetSequence();
+  } catch (e) {
+    // Failed to open — caller will retry.
+    return;
+  }
 
   // Input state.
   var lastState = const PendantState(
@@ -123,15 +187,11 @@ void main() async {
   var line1Mode = _Line1Mode.step;
   DisplayUpdate? lastSentUpdate;
 
-  // Track total lines drawn so we can rewind cursor.
-  var lineCount = 0;
-  var firstDraw = true;
-
   void redraw() {
     final lines = <String>[];
 
     // -- Input section --
-    lines.add(_rule('+', '+', ' WHB04B Pendant '));
+    lines.add(_rule('+', '+', ' xHB04B Pendant '));
 
     final b1 = lastState.button1 == PendantButton.none
         ? ''
@@ -179,7 +239,7 @@ void main() async {
     lines.add(_pad(' Mode:    ${conn.motionMode.name}'));
     lines.add(_pad(''));
 
-    // -- LCD mockup (4 lines matching WHB04B physical display) --
+    // -- LCD mockup (4 lines matching xHB04B physical display) --
     lines.add(_pad(' -- LCD Output --'));
     final String line1;
     switch (line1Mode) {
@@ -276,18 +336,7 @@ void main() async {
     );
     lines.add(_rule('+', '+'));
 
-    // Rewind cursor if not the first draw.
-    if (!firstDraw && lineCount > 0) {
-      stdout.write(_moveUp(lineCount));
-    }
-
-    // Write each line, clearing remnants.
-    for (final l in lines) {
-      stdout.write('$_clearLine\r$l\n');
-    }
-
-    lineCount = lines.length;
-    firstDraw = false;
+    writeLines(lines);
   }
 
   // Rates-per-second counter (1 Hz).
@@ -321,26 +370,10 @@ void main() async {
     if (conn.isOpen) conn.updateDisplay(update);
   });
 
-  // Graceful shutdown.
-  late StreamSubscription<PendantState> sub;
-  var exiting = false;
+  // Wait for the session to end (disconnect or error).
+  final sessionDone = Completer<void>();
 
-  Future<void> cleanup() async {
-    if (exiting) return;
-    exiting = true;
-    displayTimer.cancel();
-    statsTimer.cancel();
-    await sub.cancel();
-    await conn.close();
-    stdout.write(_showCursor);
-  }
-
-  ProcessSignal.sigint.watch().listen((_) async {
-    await cleanup();
-    exit(0);
-  });
-
-  sub = stream.listen(
+  final sub = stream.listen(
     (state) {
       inputPackets++;
       inputWindowCount++;
@@ -373,14 +406,19 @@ void main() async {
       lastState = state;
       redraw();
     },
-    onError: (Object e) async {
-      await cleanup();
-      stderr.writeln('\nDevice error: $e');
-      exit(1);
+    onError: (Object e) {
+      if (!sessionDone.isCompleted) sessionDone.complete();
     },
-    onDone: () async {
-      await cleanup();
-      exit(0);
+    onDone: () {
+      if (!sessionDone.isCompleted) sessionDone.complete();
     },
   );
+
+  await sessionDone.future;
+
+  // Tear down session resources.
+  displayTimer.cancel();
+  statsTimer.cancel();
+  await sub.cancel();
+  await conn.close();
 }

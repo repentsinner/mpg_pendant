@@ -6,13 +6,15 @@ import '../protocol/constants.dart';
 import '../protocol/display_encoder.dart';
 import '../protocol/input_packet.dart';
 import '../protocol/models.dart';
+import 'package:hidapi/hidapi.dart' as hidapi;
+
 import 'hid_backend.dart';
 import 'hid_worker.dart';
 import 'hidapi_hid_backend.dart';
 import 'isolate_messages.dart';
 import 'pendant_discovery.dart';
 
-/// Manages a connection to a single WHB04B pendant.
+/// Manages a connection to a single xHB04B pendant.
 ///
 /// Provides a stream of decoded [PendantState] events and methods
 /// to send display updates.
@@ -118,6 +120,11 @@ class PendantConnection {
 
     // Open write handle on the main isolate so display writes don't
     // contend with the worker's read loop.
+    //
+    // On macOS, hidapi defaults to exclusive device access, which
+    // prevents the worker isolate from opening the same device for
+    // reads. Disable exclusive mode so both handles can coexist.
+    hidapi.hidDarwinSetOpenExclusive(false);
     _writeBackend = HidapiHidBackend();
     _isolateWriteHandle = _writeBackend!.open(_pendant.writeDevice.path);
 
@@ -204,16 +211,25 @@ class PendantConnection {
 
     final reports = encodeDisplayUpdate(effective);
 
-    if (_useIsolate) {
-      final handle = _isolateWriteHandle!;
-      for (final report in reports) {
-        _writeBackend!.sendFeatureReport(handle, report);
+    try {
+      if (_useIsolate) {
+        final handle = _isolateWriteHandle!;
+        for (final report in reports) {
+          _writeBackend!.sendFeatureReport(handle, report);
+        }
+      } else {
+        final handle = _writeHandle!;
+        for (final report in reports) {
+          _backend!.sendFeatureReport(handle, report);
+        }
       }
-    } else {
-      final handle = _writeHandle!;
-      for (final report in reports) {
-        _backend!.sendFeatureReport(handle, report);
+    } on HidException {
+      // Device was disconnected — surface as a stream error and tear down.
+      if (_controller != null && !_controller!.isClosed) {
+        _controller!
+            .addError(Exception('Device disconnected during display write'));
       }
+      close();
     }
   }
 
