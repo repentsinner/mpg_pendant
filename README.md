@@ -4,7 +4,7 @@ Cross-platform USB HID driver for CNC MPG pendants. Decodes button presses,
 jog wheel movement, and selector positions into structured Dart objects.
 Encodes machine state back to the pendant's LCD display.
 
-Currently supports XHC HB04B-family pendants — both wired (LHB04B) and
+Currently supports XHC xHB04B-family pendants — both wired (LHB04B) and
 wireless (WHB04B), in 4-axis and 6-axis variants.
 
 ## Features

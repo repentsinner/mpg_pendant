@@ -1,4 +1,4 @@
-/// Cross-platform USB HID driver for XHC WHB04B-family CNC pendants.
+/// Cross-platform USB HID driver for XHC xHB04B-family CNC pendants.
 library;
 
 // Protocol layer — pure Dart, no I/O.
