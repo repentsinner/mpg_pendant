@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/repentsinner/mpg_pendant/compare/mpg_pendant-v0.1.3...mpg_pendant-v0.1.4) (2026-02-26)
+
+
+### Features
+
+* fix macOS exclusive device access and handle disconnect gracefully ([#16](https://github.com/repentsinner/mpg_pendant/issues/16)) ([5309c8e](https://github.com/repentsinner/mpg_pendant/commit/5309c8e820867f8f94d90ba7b7ab8fb454803843))
+
 ## [0.1.3](https://github.com/repentsinner/mpg_pendant/compare/mpg_pendant-v0.1.2...mpg_pendant-v0.1.3) (2026-02-24)
 
 
