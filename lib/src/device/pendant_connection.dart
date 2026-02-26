@@ -226,8 +226,9 @@ class PendantConnection {
     } on HidException {
       // Device was disconnected — surface as a stream error and tear down.
       if (_controller != null && !_controller!.isClosed) {
-        _controller!
-            .addError(Exception('Device disconnected during display write'));
+        _controller!.addError(
+          Exception('Device disconnected during display write'),
+        );
       }
       close();
     }
