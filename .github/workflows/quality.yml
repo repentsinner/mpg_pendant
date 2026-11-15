@@ -1,44 +1,130 @@
-# quality — everything this repository verifies, behind one required check.
-#
-# GitHub names a check run after the JOB, so the job id `quality` is the
-# context registered in the branch ruleset. The work is one job because it
-# is one setup: splitting analyze, format and test would pay for the Dart
-# SDK and libudev three times over for no extra signal.
+# quality — the merge gate. Branch rulesets require the `quality / <class>`
+# summary jobs at the bottom, never the jobs that do the work, so jobs here
+# can be added, split or renamed without touching a ruleset.
 name: quality
 
 on:
+  push:
+    branches: [main]
   pull_request:
-  merge_group: # required for merge-queue compatibility
+  merge_group:
+
+permissions:
+  contents: read
 
 jobs:
-  quality:
+  classify:
     runs-on: ubuntu-latest
+    outputs:
+      derived_release_commit: ${{ steps.classify.outputs.derived_release_commit }}
+      promotion_pr: ${{ steps.classify.outputs.promotion_pr }}
     steps:
-      # Classify the triggering commit so Flywheel's own commits
-      # (chore(release):, back-merge) skip the suite. A step-level `if:`
-      # that evaluates false still reports `success`, so the required check
-      # stays satisfied rather than hanging — which is why this is a single
-      # job with guarded steps and not a job-level `if:`.
       - id: classify
         uses: point-source/flywheel/classify@59758d1940ebe054ce9fdd4b7a7dc79a0cf235e0 # v2.1.0
-      - uses: actions/checkout@v4
-        if: steps.classify.outputs.derived_release_commit != 'true'
-      - uses: dart-lang/setup-dart@v1
-        if: steps.classify.outputs.derived_release_commit != 'true'
+
+  governance-lint:
+    needs: classify
+    if: needs.classify.outputs.derived_release_commit != 'true' && needs.classify.outputs.promotion_pr != 'true'
+    uses: repentsinner/symphonize/.github/workflows/governance-lint.yml@c923c65b044d3ab7866520b5bfba5fca939aac6f # notation--v0.2.16
+    with:
+      readme-type: library
+
+  # One job because it is one setup: splitting analyze, format and test would
+  # pay for the Dart SDK and libudev three times over for no extra signal.
+  dart:
+    needs: classify
+    if: needs.classify.outputs.derived_release_commit != 'true' && needs.classify.outputs.promotion_pr != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: dart-lang/setup-dart@2286a0c042b44434fe26d292bbce8d34f7ec662b # v1.8.2
         with:
           sdk: '3.10.0'
       - name: Install libudev
-        if: steps.classify.outputs.derived_release_commit != 'true'
         run: sudo apt-get update && sudo apt-get install -y libudev-dev
       - name: Resolve dependencies
-        if: steps.classify.outputs.derived_release_commit != 'true'
         run: dart pub get
       - name: Analyze
-        if: steps.classify.outputs.derived_release_commit != 'true'
         run: dart analyze --fatal-infos
       - name: Format
-        if: steps.classify.outputs.derived_release_commit != 'true'
         run: dart format --output=none --set-exit-if-changed .
       - name: Test
-        if: steps.classify.outputs.derived_release_commit != 'true'
         run: dart test
+
+  actionlint:
+    needs: classify
+    if: needs.classify.outputs.derived_release_commit != 'true' && needs.classify.outputs.promotion_pr != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      # Digest copied from the release's checksums file, so a replaced
+      # release asset fails here rather than running.
+      - name: Install actionlint
+        env:
+          ACTIONLINT_VERSION: 1.7.12
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="$RUNNER_TEMP/actionlint.tar.gz"
+          curl -sfLo "$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "${ACTIONLINT_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" actionlint
+
+      # actionlint skips run: blocks silently when shellcheck is absent, so
+      # its absence has to fail the job rather than pass it.
+      - name: Lint workflows
+        run: |
+          command -v shellcheck
+          "$RUNNER_TEMP/actionlint"
+
+  # Summary jobs carry the required check names. Each runs whatever its
+  # dependencies' outcome, because GitHub counts a skipped required check as
+  # passing. classify is a dependency too: if it fails, the class jobs skip.
+  governance:
+    name: quality / governance
+    needs: [classify, governance-lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when a governance job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          exit 1
+
+  correctness:
+    name: quality / correctness
+    needs: [classify, dart, actionlint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when a correctness job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          exit 1
+
+  # Transitional: the live review ruleset still requires a check named
+  # `quality`. Remove this job once the template's Review ruleset replaces it.
+  quality:
+    name: quality
+    needs: [classify, dart]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when a correctness job failed or was cancelled
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$NEEDS"
+          exit 1
