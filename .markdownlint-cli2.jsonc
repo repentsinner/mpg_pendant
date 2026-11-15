@@ -1,3 +1,11 @@
 {
+  // Rules live here rather than in .markdownlint.json: rumdl, the engine
+  // the governance lint runs, reads only this file when it exists.
+  "config": {
+    "MD013": false,
+    "MD024": false,
+    // Status lines are italic by contract, not headings.
+    "MD036": false
+  },
   "ignores": ["CHANGELOG.md"]
 }
